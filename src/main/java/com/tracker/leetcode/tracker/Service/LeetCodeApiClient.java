@@ -136,10 +136,11 @@ public class LeetCodeApiClient {
         return recentList;
     }
 
-    // 4. Fetch Extended Profile (Badges, Socials, Contests, Rank, About)
+    // 4. Fetch Extended Profile (Badges, Socials, Contests, Rank, About, AVATAR)
     public Student fetchExtendedProfileDetails(String username) {
+        // ADDED 'userAvatar' TO THE GRAPHQL QUERY
         String query = """
-                {"query":"query fullProfile($username: String!) { matchedUser(username: $username) { githubUrl twitterUrl linkedinUrl profile { ranking aboutMe } badges { name icon creationDate } } userContestRanking(username: $username) { rating } userContestRankingHistory(username: $username) { attended rating ranking problemsSolved totalProblems contest { title startTime } } }","variables":{"username":"%s"}}
+                {"query":"query fullProfile($username: String!) { matchedUser(username: $username) { githubUrl twitterUrl linkedinUrl profile { ranking aboutMe userAvatar } badges { name icon creationDate } } userContestRanking(username: $username) { rating } userContestRankingHistory(username: $username) { attended rating ranking problemsSolved totalProblems contest { title startTime } } }","variables":{"username":"%s"}}
                 """.formatted(username);
 
         JsonNode root = executeGraphQLQuery(query, username);
@@ -153,9 +154,10 @@ public class LeetCodeApiClient {
         JsonNode matchedUser = data.path("matchedUser");
         JsonNode profile = matchedUser.path("profile");
 
-        // 1. Parse Central Fields & Social Media
+        // 1. Parse Central Fields, Avatar, & Social Media
         extendedData.setAbout(profile.path("aboutMe").asString(null));
         extendedData.setRank(profile.path("ranking").asString("Unranked"));
+        extendedData.setAvatarUrl(profile.path("userAvatar").asString(null)); // <-- CAPTURE THE AVATAR!
 
         extendedData.setSocialMedia(new SocialMedia(
                 matchedUser.path("githubUrl").asString(null),
@@ -206,9 +208,8 @@ public class LeetCodeApiClient {
         return extendedData;
     }
 
-    // ==========================================
     // 5. Verify Manual Submission URL
-    // ==========================================
+
     public boolean verifySubmission(String submissionId, String expectedUsername, String expectedTitleSlug) {
         String query = """
                 {"query":"query submissionDetails($submissionId: Int!) { submissionDetails(submissionId: $submissionId) { statusDisplay user { username } question { titleSlug } } }","variables":{"submissionId":%s}}

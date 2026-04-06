@@ -59,6 +59,7 @@ public class StudentMapper {
                 .consistencyStreak(calculateStreak(student.getProgressHistory()))
                 .completedAssignments(completed)
                 .pendingAssignments(pending)
+                .avatarUrl(student.getAvatarUrl())
                 .build();
     }
 
@@ -103,6 +104,7 @@ public class StudentMapper {
                 .progressHistory(student.getProgressHistory())
 
                 // Fallbacks just in case the arrays are empty
+                .avatarUrl(student.getAvatarUrl())
                 .build();
     }
 

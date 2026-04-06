@@ -16,4 +16,5 @@ public class StudentSummaryDTO {
     private int completedAssignments;
     private int pendingAssignments;
     private String email;
+    private String avatarUrl;
 }

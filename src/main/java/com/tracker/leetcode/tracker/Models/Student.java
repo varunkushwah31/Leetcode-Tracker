@@ -33,6 +33,7 @@ public class Student implements UserDetails {
     private Role role = Role.STUDENT;
     private AuthProvider authProvider = AuthProvider.LOCAL;
     private boolean enabled = true;
+    private String avatarUrl;
 
 
     private List<DailyProgress> progressHistory = new ArrayList<>();

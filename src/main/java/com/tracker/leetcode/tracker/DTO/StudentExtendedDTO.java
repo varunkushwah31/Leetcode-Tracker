@@ -21,4 +21,5 @@ public class StudentExtendedDTO {
     private List<DailyProgress> progressHistory;
     private String id;
     private String email;
+    private String avatarUrl;
 }
