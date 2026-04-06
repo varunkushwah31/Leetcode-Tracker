@@ -85,6 +85,7 @@ public class StudentService {
     }
 
     // Inside StudentService.java
+    //
     @Async("taskExecutor")
     public CompletableFuture<Void> syncProfileAsync(String username) {
         try {
