@@ -22,4 +22,6 @@ public class StudentExtendedDTO {
     private String id;
     private String email;
     private String avatarUrl;
+    private List<String> manuallyCompletedAssignments;
+    private List<Classroom> classrooms;
 }

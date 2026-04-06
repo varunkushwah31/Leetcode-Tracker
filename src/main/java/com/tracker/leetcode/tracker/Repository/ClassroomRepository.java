@@ -7,4 +7,5 @@ import java.util.List;
 
 public interface ClassroomRepository extends MongoRepository<Classroom,String > {
     List<Classroom> findByMentorId(String mentorId);
+    List<Classroom> findByStudentIdsContaining(String studentId);
 }

@@ -21,22 +21,13 @@ public class LeetcodeScheduler {
 
     @Scheduled(cron = "0 55 23 * * ?")
 //    @Scheduled(fixedRate = 30000) // Runs every 30,000 milliseconds
-    public void updateAllStudentsDaily(){
-        log.info("Starting daily LeetCode data fetch for all students...");
-        List<Student> classroom = studentRepository.findAll();
-        if (classroom.isEmpty()){
-            System.out.println("No Student found in the database. Scheduler aborting.");
-            return;
+    // Inside LeetcodeScheduler.java
+    public void updateAllStudentsDaily() {
+        List<Student> students = studentRepository.findAll();
+        for (Student student : students) {
+            // This fires off the task to a background thread and immediately moves to the next student
+            studentService.syncProfileAsync(student.getLeetcodeUsername());
         }
-        for (Student student : classroom){
-            log.info("Fetching data for: {}" , student.getLeetcodeUsername());
-            try {
-                studentService.fetchAndUpdateStudentProgress(student.getLeetcodeUsername());
-                Thread.sleep(2000);
-            } catch (InterruptedException e){
-                System.err.println("Scheduler Interrupted during sleep: " + e.getMessage());
-            }
-        }
-        System.out.println("Daily LeetCode Fetch Completed Successfully!");
     }
+
 }

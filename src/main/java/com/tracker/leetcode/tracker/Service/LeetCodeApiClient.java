@@ -208,37 +208,42 @@ public class LeetCodeApiClient {
         return extendedData;
     }
 
-    // 5. Verify Manual Submission URL
+    // 5. Verify Manual Submission URL (Bypassing Privacy Block)
 
     public boolean verifySubmission(String submissionId, String expectedUsername, String expectedTitleSlug) {
+
+        // Instead of querying the protected submissionDetails, we query the public recentAcSubmissionList
+        // We fetch their last 20 accepted submissions to see if the ID is in there.
         String query = """
-                {"query":"query submissionDetails($submissionId: Int!) { submissionDetails(submissionId: $submissionId) { statusDisplay user { username } question { titleSlug } } }","variables":{"submissionId":%s}}
-                """.formatted(submissionId);
+                {"query":"query recentAcSubmissions($username: String!, $limit: Int!) { recentAcSubmissionList(username: $username, limit: $limit) { id titleSlug } }","variables":{"username":"%s","limit":20}}
+                """.formatted(expectedUsername);
 
         JsonNode root = executeGraphQLQuery(query, expectedUsername);
-        JsonNode details = root.path("data").path("submissionDetails");
+        JsonNode submissionList = root.path("data").path("recentAcSubmissionList");
 
-        // If the node is missing, the ID is fake or the submission is private
-        if (details.isMissingNode() || details.isNull()) {
-            log.warn("Submission ID {} not found or is private.", submissionId);
+        if (submissionList.isMissingNode() || submissionList.isNull() || !submissionList.isArray()) {
+            log.warn("Could not fetch recent submissions or list is empty for user: {}", expectedUsername);
             return false;
         }
 
         try {
-            // Using your specific tools.jackson .asString() method!
-            String status = details.path("statusDisplay").asString();
-            String actualUsername = details.path("user").path("username").asString();
-            String actualSlug = details.path("question").path("titleSlug").asString();
+            // Loop through their recent accepted submissions looking for a match
+            for (JsonNode node : submissionList) {
+                String actualId = node.path("id").asString();
+                String actualSlug = node.path("titleSlug").asString();
 
-            log.info("Verification Details -> Status: {}, User: {}, Slug: {}", status, actualUsername, actualSlug);
+                // If the ID matches AND the question matches, it's 100% valid!
+                if (submissionId.equals(actualId) && expectedTitleSlug.equalsIgnoreCase(actualSlug)) {
+                    log.info("Validation Successful -> Found ID: {} for Slug: {}", actualId, actualSlug);
+                    return true;
+                }
+            }
 
-            // It MUST be Accepted, belong to the right user, and be the right question
-            return "Accepted".equalsIgnoreCase(status) &&
-                    expectedUsername.equalsIgnoreCase(actualUsername) &&
-                    expectedTitleSlug.equalsIgnoreCase(actualSlug);
+            log.warn("Submission ID {} not found in the recent 20 Accepted submissions for {}.", submissionId, expectedUsername);
+            return false;
 
         } catch (Exception e) {
-            log.error("Failed to parse submission details for ID {}", submissionId);
+            log.error("Failed to parse recent submissions array for validation: {}", e.getMessage());
             return false;
         }
     }

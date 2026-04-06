@@ -94,16 +94,22 @@ public class StudentController {
 
     @GetMapping("/me/dashboard")
     public ResponseEntity<StudentExtendedDTO> getMyDashboard(@AuthenticationPrincipal Student currentStudent) {
-        // @AuthenticationPrincipal magically injects the currently logged-in user
-        // directly from the JWT token!
-
         log.info("Student {} is viewing their dashboard", currentStudent.getEmail());
 
-        // Ensure we have the freshest data from the DB
         Student freshStudentData = studentRepository.findById(currentStudent.getId())
                 .orElseThrow(() -> new RuntimeException("Student not found"));
 
-        return ResponseEntity.ok(mapper.toExtendedDTO(freshStudentData));
+        // 1. Build the base DTO
+        StudentExtendedDTO dto = mapper.toExtendedDTO(freshStudentData);
+
+        // 2. Fetch all classrooms this student is enrolled in
+        List<Classroom> myClassrooms = classroomRepository.findByStudentIdsContaining(freshStudentData.getId());
+
+        // 3. Attach the new data!
+        dto.setClassrooms(myClassrooms);
+        dto.setManuallyCompletedAssignments(freshStudentData.getManuallyCompletedAssignments());
+
+        return ResponseEntity.ok(dto);
     }
 
     // URL: POST /api/students/me/classrooms/{classroomId}/assignments/{assignmentId}/validate

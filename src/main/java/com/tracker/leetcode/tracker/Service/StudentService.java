@@ -5,7 +5,10 @@ import com.tracker.leetcode.tracker.Models.Student;
 import com.tracker.leetcode.tracker.Repository.StudentRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+
+import java.util.concurrent.CompletableFuture;
 
 @Slf4j
 @Service
@@ -55,6 +58,7 @@ public class StudentService {
         student.setSocialMedia(extendedData.getSocialMedia());
         student.setBadges(extendedData.getBadges());
         student.setContestHistory(extendedData.getContestHistory());
+        student.setAvatarUrl(extendedData.getAvatarUrl());
 
         return studentRepository.save(student);
     }
@@ -66,7 +70,7 @@ public class StudentService {
 
         student.setProgressHistory(leetCodeApiClient.fetchCalendarData(username));
         student.setProblemStats(leetCodeApiClient.fetchProblemStats(username));
-        student.setRecentSubmissions(leetCodeApiClient.fetchRecentSubmissions(username, 5));
+        student.setRecentSubmissions(leetCodeApiClient.fetchRecentSubmissions(username, 20));
 
         Student extendedData = leetCodeApiClient.fetchExtendedProfileDetails(username);
         student.setAbout(extendedData.getAbout());
@@ -75,7 +79,19 @@ public class StudentService {
         student.setSocialMedia(extendedData.getSocialMedia());
         student.setBadges(extendedData.getBadges());
         student.setContestHistory(extendedData.getContestHistory());
+        student.setAvatarUrl(extendedData.getAvatarUrl());
 
         return studentRepository.save(student);
+    }
+
+    // Inside StudentService.java
+    @Async("taskExecutor")
+    public CompletableFuture<Void> syncProfileAsync(String username) {
+        try {
+            syncAllProfileData(username);
+        } catch (Exception e) {
+            log.error("Async sync failed for {}", username);
+        }
+        return CompletableFuture.completedFuture(null);
     }
 }
