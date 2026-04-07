@@ -14,8 +14,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
-
 import java.util.List;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 
 @Slf4j
 @RestController
@@ -109,6 +110,7 @@ public class ClassroomController {
         return ResponseEntity.badRequest().body("Student does not have a valid email address.");
     }
 
+    // 1. Endpoint for Bulk Import (Receives a file)
     @PostMapping("/{classroomId}/students/bulk")
     public ResponseEntity<List<String>> bulkAddStudents(
             @PathVariable String classroomId,
@@ -116,5 +118,18 @@ public class ClassroomController {
 
         List<String> failedAdds = classroomService.bulkAddStudents(classroomId, file);
         return ResponseEntity.ok(failedAdds);
+    }
+
+    // 2. Endpoint for CSV Export (Returns a downloadable file)
+    @GetMapping(value = "/{classroomId}/export", produces = "text/csv")
+    public ResponseEntity<byte[]> exportClassroom(@PathVariable String classroomId) {
+        String csvData = classroomService.generateClassroomCsv(classroomId);
+        byte[] output = csvData.getBytes();
+
+        HttpHeaders headers = new HttpHeaders();
+        // This header tells the browser to download it as a file rather than displaying it as text
+        headers.set(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"leaderboard_" + classroomId + ".csv\"");
+
+        return new ResponseEntity<>(output, headers, HttpStatus.OK);
     }
 }
