@@ -42,6 +42,7 @@ public class Student implements UserDetails {
     private List<ProblemStats> problemStats = new ArrayList<>();
     private List<RecentSubmission> recentSubmissions = new ArrayList<>();
     private List<String > manuallyCompletedAssignments = new ArrayList<>();
+    private List<SkillStat> skills = new ArrayList<>();
 
 
     public Student(String leetcodeUsername, String name) {

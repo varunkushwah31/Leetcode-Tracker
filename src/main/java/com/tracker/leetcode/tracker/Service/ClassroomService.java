@@ -1,13 +1,11 @@
 package com.tracker.leetcode.tracker.Service;
 
+import com.tracker.leetcode.tracker.DTO.ClassroomAnalyticsDTO;
 import com.tracker.leetcode.tracker.DTO.ClassroomDashboardDTO;
 import com.tracker.leetcode.tracker.DTO.StudentSummaryDTO;
 import com.tracker.leetcode.tracker.Exception.*;
 import com.tracker.leetcode.tracker.Mapper.StudentMapper;
-import com.tracker.leetcode.tracker.Models.Assignment;
-import com.tracker.leetcode.tracker.Models.Classroom;
-import com.tracker.leetcode.tracker.Models.Mentor;
-import com.tracker.leetcode.tracker.Models.Student;
+import com.tracker.leetcode.tracker.Models.*;
 import com.tracker.leetcode.tracker.Repository.ClassroomRepository;
 import com.tracker.leetcode.tracker.Repository.MentorRepository;
 import com.tracker.leetcode.tracker.Repository.StudentRepository;
@@ -312,5 +310,83 @@ public class ClassroomService {
         // 4. Save the updated classroom back to MongoDB
         classroomRepository.save(classroom);
         log.info("Successfully assigned {} to classroom {}", titleSlug, classroom.getClassName());
+    }
+
+    // NEW: Get Classroom Analytics
+    public ClassroomAnalyticsDTO getClassroomAnalytics(String classroomId) {
+        log.info("Generating Analytics for Classroom ID: {}", classroomId);
+
+        Classroom classroom = classroomRepository.findById(classroomId)
+                .orElseThrow(() -> new ClassroomNotFoundException("Classroom not found"));
+
+        List<Student> students = studentRepository.findAllById(classroom.getStudentIds());
+        int totalStudents = students.size();
+
+        if (totalStudents == 0) {
+            return ClassroomAnalyticsDTO.builder()
+                    .classroomId(classroomId).className(classroom.getClassName()).totalStudents(0)
+                    .build();
+        }
+
+        int totalSolved = 0, totalEasy = 0, totalMed = 0, totalHard = 0, activeCount = 0;
+        java.util.Map<String, Integer> aggregatedSkills = new java.util.HashMap<>();
+
+        long oneWeekAgo = System.currentTimeMillis() / 1000 - (7 * 86400);
+
+        for (Student s : students) {
+            // 1. Calculate Difficulties
+            if (s.getProblemStats() != null) {
+                for (var stat : s.getProblemStats()) {
+                    switch (stat.getDifficulty().toLowerCase()) {
+                        case "all" -> totalSolved += stat.getCount();
+                        case "easy" -> totalEasy += stat.getCount();
+                        case "medium" -> totalMed += stat.getCount();
+                        case "hard" -> totalHard += stat.getCount();
+                    }
+                }
+            }
+
+            // 2. Check Engagement (Active in last 7 days)
+            boolean isActive = s.getRecentSubmissions() != null && s.getRecentSubmissions().stream()
+                    .anyMatch(sub -> sub.getTimestamp() >= oneWeekAgo);
+            if (isActive) activeCount++;
+
+            // 3. Aggregate Skills
+            if (s.getSkills() != null) {
+                for (var skill : s.getSkills()) {
+                    aggregatedSkills.merge(skill.getTagName(), skill.getProblemsSolved(), Integer::sum);
+                }
+            }
+        }
+
+        // Sort skills by total solved across the class
+        List<SkillStat> sortedSkills = aggregatedSkills.entrySet().stream()
+                .map(e -> new SkillStat(e.getKey(), e.getValue()))
+                .sorted((a, b) -> Integer.compare(b.getProblemsSolved(), a.getProblemsSolved()))
+                .toList();
+
+        // Top 5 Strengths
+        List<SkillStat> topStrengths = sortedSkills.stream().limit(5).toList();
+
+        // Top 5 Weaknesses (Topics they have barely touched, but at least 1 person tried)
+        List<SkillStat> criticalWeaknesses = sortedSkills.stream()
+                .filter(s -> s.getProblemsSolved() > 0) // Ignore completely untouched
+                .skip(Math.max(0, sortedSkills.size() - 5)) // Get the bottom 5
+                .sorted((a, b) -> Integer.compare(a.getProblemsSolved(), b.getProblemsSolved())) // Sort ascending for weaknesses
+                .toList();
+
+        return ClassroomAnalyticsDTO.builder()
+                .classroomId(classroomId)
+                .className(classroom.getClassName())
+                .totalStudents(totalStudents)
+                .averageTotalSolved(totalSolved / totalStudents)
+                .averageEasy(totalEasy / totalStudents)
+                .averageMedium(totalMed / totalStudents)
+                .averageHard(totalHard / totalStudents)
+                .activeStudentsThisWeek(activeCount)
+                .classEngagementScore((activeCount * 100.0) / totalStudents)
+                .topStrengths(topStrengths)
+                .criticalWeaknesses(criticalWeaknesses)
+                .build();
     }
 }

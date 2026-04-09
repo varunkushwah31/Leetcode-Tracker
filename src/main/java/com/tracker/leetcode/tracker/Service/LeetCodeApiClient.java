@@ -247,4 +247,34 @@ public class LeetCodeApiClient {
             return false;
         }
     }
+
+    // 6. Fetch Skill Stats (Topic Tags)
+    public List<SkillStat> fetchSkillStats(String username) {
+        String query = """
+                {"query":"query skillStats($username: String!) { matchedUser(username: $username) { tagProblemCounts { advanced { tagName problemsSolved } intermediate { tagName problemsSolved } fundamental { tagName problemsSolved } } } }","variables":{"username":"%s"}}
+                """.formatted(username);
+
+        JsonNode root = executeGraphQLQuery(query, username);
+        JsonNode tagCounts = root.path("data").path("matchedUser").path("tagProblemCounts");
+
+        List<SkillStat> skills = new ArrayList<>();
+        if (tagCounts.isMissingNode() || tagCounts.isNull()) {
+            return skills;
+        }
+
+        // Helper to parse the 3 difficulty arrays
+        String[] levels = {"fundamental", "intermediate", "advanced"};
+        for (String level : levels) {
+            JsonNode levelNode = tagCounts.path(level);
+            if (levelNode.isArray()) {
+                for (JsonNode tag : levelNode) {
+                    skills.add(new SkillStat(
+                            tag.path("tagName").asString(),
+                            tag.path("problemsSolved").asInt()
+                    ));
+                }
+            }
+        }
+        return skills;
+    }
 }

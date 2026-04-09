@@ -1,5 +1,6 @@
 package com.tracker.leetcode.tracker.Controller;
 
+import com.tracker.leetcode.tracker.DTO.ClassroomAnalyticsDTO;
 import com.tracker.leetcode.tracker.DTO.ClassroomDashboardDTO;
 import com.tracker.leetcode.tracker.DTO.SubmissionUrlRequest;
 import com.tracker.leetcode.tracker.Models.Assignment;
@@ -129,5 +130,11 @@ public class ClassroomController {
         headers.set(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"leaderboard_" + classroomId + ".csv\"");
 
         return new ResponseEntity<>(output, headers, HttpStatus.OK);
+    }
+
+
+    @GetMapping("/{classroomId}/analytics")
+    public ResponseEntity<ClassroomAnalyticsDTO> getClassroomAnalytics(@PathVariable String classroomId) {
+        return ResponseEntity.ok(classroomService.getClassroomAnalytics(classroomId));
     }
 }
