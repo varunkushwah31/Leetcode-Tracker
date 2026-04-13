@@ -5,6 +5,8 @@ import com.tracker.leetcode.tracker.Models.Student;
 import com.tracker.leetcode.tracker.Repository.StudentRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
@@ -24,6 +26,11 @@ public class StudentService {
                 .orElseThrow(() -> new StudentNotFoundException("Student '" + username + "' not found in database. Please add them first!"));
     }
 
+    /**
+     * Fetches and updates student progress (calendar heatmap)
+     * Results are cached for 30 minutes
+     */
+    @Cacheable(value = "student-progress", key = "#username")
     public Student fetchAndUpdateStudentProgress(String username) {
         log.info("Updating calendar heatmap for user: {}", username);
         Student student = getStudentOrThrow(username);
@@ -31,6 +38,11 @@ public class StudentService {
         return studentRepository.save(student);
     }
 
+    /**
+     * Fetches and updates problem statistics
+     * Results are cached for 30 minutes
+     */
+    @Cacheable(value = "student-stats", key = "#username")
     public Student fetchAndUpdateProblemStats(String username) {
         log.info("Updating problem stats for user: {}", username);
         Student student = getStudentOrThrow(username);
@@ -38,6 +50,11 @@ public class StudentService {
         return studentRepository.save(student);
     }
 
+    /**
+     * Fetches and updates recent submissions
+     * Results are cached for 30 minutes
+     */
+    @Cacheable(value = "student-recent", key = "#username")
     public Student fetchAndUpdateRecentSubmissions(String username) {
         log.info("Updating recent submissions for user: {}", username);
         Student student = getStudentOrThrow(username);
@@ -45,7 +62,11 @@ public class StudentService {
         return studentRepository.save(student);
     }
 
-    // THIS IS THE METHOD FOR TEST 3
+    /**
+     * Fetches and updates extended profile (socials, contests, badges)
+     * Results are cached for 1 hour
+     */
+    @Cacheable(value = "student-profile", key = "#username")
     public Student fetchAndUpdateExtendedProfile(String username) {
         log.info("Updating extended profile (Socials, Contests, Badges) for user: {}", username);
         Student student = getStudentOrThrow(username);
@@ -64,7 +85,11 @@ public class StudentService {
         return studentRepository.save(student);
     }
 
-    // BONUS: The "Sync All" method for your automated Scheduler!
+    /**
+     * Syncs all profile data and clears related caches to ensure fresh data
+     */
+    @CacheEvict(value = {"student-progress", "student-stats", "student-recent", "student-profile"},
+                key = "#username", allEntries = false)
     public Student syncAllProfileData(String username) {
         log.info("Performing FULL profile sync for user: {}", username);
         Student student = getStudentOrThrow(username);
@@ -72,7 +97,6 @@ public class StudentService {
         student.setProgressHistory(leetCodeApiClient.fetchCalendarData(username));
         student.setProblemStats(leetCodeApiClient.fetchProblemStats(username));
         student.setRecentSubmissions(leetCodeApiClient.fetchRecentSubmissions(username, 20));
-        student.setSkills(leetCodeApiClient.fetchSkillStats(username));
         student.setSkills(leetCodeApiClient.fetchSkillStats(username));
 
         Student extendedData = leetCodeApiClient.fetchExtendedProfileDetails(username);
@@ -87,8 +111,9 @@ public class StudentService {
         return studentRepository.save(student);
     }
 
-    // Inside StudentService.java
-    //
+    /**
+     * Async profile synchronization with cache invalidation
+     */
     @Async("taskExecutor")
     public CompletableFuture<Void> syncProfileAsync(String username) {
         try {

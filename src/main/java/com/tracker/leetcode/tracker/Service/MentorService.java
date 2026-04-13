@@ -7,6 +7,8 @@ import com.tracker.leetcode.tracker.Models.Mentor;
 import com.tracker.leetcode.tracker.Repository.MentorRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -31,6 +33,7 @@ public class MentorService {
     }
 
     // 1. Create a new Mentor
+    @CacheEvict(value = "mentors-all", allEntries = true)
     public MentorDTO createMentor(Mentor mentor) {
         log.info("Attempting to create mentor with email: {}", mentor.getEmail());
 
@@ -45,6 +48,7 @@ public class MentorService {
     }
 
     // 2. Get a specific Mentor by ID
+    @Cacheable(value = "mentor", key = "#mentorId")
     public MentorDTO getMentorById(String mentorId) {
         log.info("Fetching mentor with ID: {}", mentorId);
         Mentor mentor = mentorRepository.findById(mentorId)
@@ -53,6 +57,7 @@ public class MentorService {
     }
 
     // 3. Get all Mentors (Useful for an Admin panel)
+    @Cacheable(value = "mentors-all")
     public List<MentorDTO> getAllMentors() {
         log.info("Fetching all mentors");
         return mentorRepository.findAll()

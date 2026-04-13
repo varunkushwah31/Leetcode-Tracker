@@ -11,6 +11,8 @@ import com.tracker.leetcode.tracker.Repository.MentorRepository;
 import com.tracker.leetcode.tracker.Repository.StudentRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -35,6 +37,7 @@ public class ClassroomService {
     private final LeetCodeApiClient leetCodeApiClient;
 
     // 1. Create Classroom
+    @CacheEvict(value = "classroom-dashboard", allEntries = true)
     public Classroom createClassroom(String mentorId, String className) {
         log.info("Creating classroom {} for mentor ID: {}", className, mentorId);
         Mentor mentor = mentorRepository.findById(mentorId)
@@ -52,6 +55,7 @@ public class ClassroomService {
     }
 
     // 2. Add Student
+    @CacheEvict(value = {"classroom-dashboard", "classroom-analytics"}, allEntries = true)
     public Classroom addStudentToClassroom(String classroomId, String leetcodeUsername) {
         log.info("Adding student {} to classroom ID: {}", leetcodeUsername, classroomId);
         Classroom classroom = classroomRepository.findById(classroomId)
@@ -70,6 +74,7 @@ public class ClassroomService {
     }
 
     // 3. Get Dashboard (with Sorting & Fetching restored!)
+    @Cacheable(value = "classroom-dashboard", key = "#classroomId + ':' + #sortBy")
     public ClassroomDashboardDTO getClassroomDashboard(String classroomId, String sortBy) {
         log.info("Fetching dashboard data for classroom ID: {} sorted by: {}", classroomId, sortBy);
 
@@ -123,6 +128,7 @@ public class ClassroomService {
     }
 
     // 4. Assign a LeetCode problem to the classroom
+    @CacheEvict(value = {"classroom-dashboard", "classroom-analytics"}, allEntries = true)
     public Classroom assignQuestionToClassroom(String classroomId, Assignment assignment) {
         log.info("Assigning question '{}' to classroom ID: {}", assignment.getTitleSlug(), classroomId);
 
@@ -313,6 +319,7 @@ public class ClassroomService {
     }
 
     // NEW: Get Classroom Analytics
+    @Cacheable(value = "classroom-analytics", key = "#classroomId")
     public ClassroomAnalyticsDTO getClassroomAnalytics(String classroomId) {
         log.info("Generating Analytics for Classroom ID: {}", classroomId);
 

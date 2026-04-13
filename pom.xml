@@ -124,6 +124,28 @@
 			<scope>compile</scope>
 		</dependency>
 
+		<!-- Source: https://mvnrepository.com/artifact/org.springframework.boot/spring-boot-starter-data-redis -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-data-redis</artifactId>
+			<version>4.0.5</version>
+			<scope>compile</scope>
+		</dependency>
+
+		<!-- Source: https://mvnrepository.com/artifact/org.springframework.boot/spring-boot-starter-cache -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-cache</artifactId>
+			<version>4.0.5</version>
+			<scope>compile</scope>
+		</dependency>
+
+		<dependency>
+			<groupId>tools.jackson.datatype</groupId>
+			<artifactId>jackson-datatype-jsr310</artifactId>
+			<version>3.0.0-rc1</version>
+		</dependency>
+
 	</dependencies>
 
 
