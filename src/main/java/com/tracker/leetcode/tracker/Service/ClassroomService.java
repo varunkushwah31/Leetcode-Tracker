@@ -19,6 +19,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 import java.util.regex.Matcher;
@@ -379,7 +380,7 @@ public class ClassroomService {
         List<SkillStat> criticalWeaknesses = sortedSkills.stream()
                 .filter(s -> s.getProblemsSolved() > 0) // Ignore completely untouched
                 .skip(Math.max(0, sortedSkills.size() - 5)) // Get the bottom 5
-                .sorted((a, b) -> Integer.compare(a.getProblemsSolved(), b.getProblemsSolved())) // Sort ascending for weaknesses
+                .sorted(Comparator.comparingInt(SkillStat::getProblemsSolved)) // Sort ascending for weaknesses
                 .toList();
 
         return ClassroomAnalyticsDTO.builder()
