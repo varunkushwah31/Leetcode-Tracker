@@ -39,7 +39,7 @@ public class ClassroomService {
     private final LeetCodeApiClient leetCodeApiClient;
 
     // 1. Create Classroom
-    @CacheEvict(value = "classroom-dashboard", allEntries = true)
+    @CacheEvict(value = {"classroom-dashboard", "classroom-analytics", "mentors-all", "mentor"}, allEntries = true)
     public Classroom createClassroom(String mentorId, String className) {
         log.info("Creating classroom {} for mentor ID: {}", className, mentorId);
         Mentor mentor = mentorRepository.findById(mentorId)
