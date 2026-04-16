@@ -1,5 +1,6 @@
 package com.tracker.leetcode.tracker.Config;
 
+import com.tracker.leetcode.tracker.Models.AuthProvider;
 import com.tracker.leetcode.tracker.Models.Mentor;
 import com.tracker.leetcode.tracker.Models.Role;
 import com.tracker.leetcode.tracker.Repository.MentorRepository;
@@ -8,6 +9,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
+
+import java.util.ArrayList;
 
 @Slf4j
 @Component
@@ -30,8 +33,11 @@ public class DatabaseSeeder implements CommandLineRunner {
             Mentor defaultAdmin = Mentor.builder()
                     .name("Master Admin")
                     .email("admin@leettracker.com")
-                    .password(passwordEncoder.encode("Admin123!")) // You can change this!
+                    .password(passwordEncoder.encode("Admin123!"))
                     .role(Role.SUPER_ADMIN)
+                    .enabled(true) // <-- Explicitly enable it
+                    .provider(AuthProvider.LOCAL) // <-- Explicitly set provider
+                    .classroomIds(new ArrayList<>()) // <-- Prevent NullPointerExceptions
                     .build();
 
             mentorRepository.save(defaultAdmin);

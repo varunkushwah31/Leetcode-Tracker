@@ -32,10 +32,13 @@ public class Mentor implements UserDetails {
 
     private Role role;
 
+    @Builder.Default
     private List<String> classroomIds = new ArrayList<>();
 
+    @Builder.Default
     private AuthProvider provider = AuthProvider.LOCAL;
 
+    @Builder.Default
     private boolean enabled = true;
 
     @Override
