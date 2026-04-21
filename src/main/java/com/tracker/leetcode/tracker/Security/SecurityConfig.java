@@ -45,6 +45,9 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/auth/**").permitAll()
                         .requestMatchers("/api/admin/**").hasRole("SUPER_ADMIN")
 
+                        // Allow WebSocket Connections 
+                        .requestMatchers("/ws-endpoint/**").permitAll()
+
                         // Mentor & Student Routes
                         .requestMatchers("/api/classrooms/**").hasAnyRole("MENTOR", "SUPER_ADMIN")
                         .requestMatchers("/api/students/me/**").hasRole("STUDENT")

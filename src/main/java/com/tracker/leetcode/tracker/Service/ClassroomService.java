@@ -13,16 +13,15 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.context.annotation.Lazy;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -37,6 +36,10 @@ public class ClassroomService {
     private final StudentRepository studentRepository;
     private final StudentMapper studentMapper;
     private final LeetCodeApiClient leetCodeApiClient;
+    private final SimpMessagingTemplate messagingTemplate;
+
+    @Lazy
+    private final ClassroomService self;
 
     // 1. Create Classroom
     @CacheEvict(value = {"classroom-dashboard", "classroom-analytics", "mentors-all", "mentor"}, allEntries = true)
@@ -233,9 +236,21 @@ public class ClassroomService {
             throw new ValidationFailedException("Validation Failed! Ensure the submission is 'Accepted', belongs to you, and is the correct problem.");
         }
 
+
+
         // Success! Save it to the student's profile
         student.getManuallyCompletedAssignments().add(assignmentId);
-        return studentRepository.save(student);
+        Student savedStudent = studentRepository.save(student);
+
+        // Broadcast the "Ping" to anyone listening to this classroom
+        log.info("Broadcasting leaderboard update for classroom: {}", classroomId);
+        messagingTemplate.convertAndSend(
+                "/topic/classrooms/" + classroomId,
+                (Object) Map.of("action", "UPDATE", "message", "Leaderboard changed!") // <-- Added (Object) cast
+        );
+
+
+        return savedStudent;
 
     }
 
@@ -273,7 +288,7 @@ public class ClassroomService {
     //
     public String generateClassroomCsv(String classroomId) {
         // Reuse your existing dashboard logic to get sorted, fully-calculated stats!
-        ClassroomDashboardDTO dashboard = getClassroomDashboard(classroomId, "solved");
+        ClassroomDashboardDTO dashboard = self.getClassroomDashboard(classroomId, "solved");
 
         StringBuilder csv = new StringBuilder();
         // Add the standard CSV Header row
@@ -298,6 +313,7 @@ public class ClassroomService {
     public void assignQuestion(String classroomId, String titleSlug, long startTimestamp, long endTimestamp) {
         log.info("Assigning question {} to classroom ID: {} with deadline from {} to {}",
                 titleSlug, classroomId, startTimestamp, endTimestamp);
+
 
         // 1. Find the classroom
         Classroom classroom = classroomRepository.findById(classroomId)
