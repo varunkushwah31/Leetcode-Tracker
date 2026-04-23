@@ -76,8 +76,13 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
 
-        // Exactly match Vite frontend
-        configuration.setAllowedOrigins(List.of("http://localhost:5173"));
+        // Exactly match Vite frontend, Swagger UI, and Production
+        configuration.setAllowedOrigins(List.of(
+            "http://localhost:5173",
+            "http://localhost:8081",
+            "http://localhost:8080",
+            "https://leettracker-backend.onrender.com"
+        ));
 
         // Allow all standard HTTP methods, including OPTIONS
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
