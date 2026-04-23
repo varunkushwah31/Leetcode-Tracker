@@ -17,7 +17,7 @@ FROM eclipse-temurin:25-jre
 WORKDIR /app
 
 # Copy the built jar from Stage 1
-COPY --from=build /app/target/tracker-0.0.1-SNAPSHOT.jar app.jar
+COPY --from=build /app/target/*.jar app.jar
 
 # Expose your backend port
 EXPOSE 8080
