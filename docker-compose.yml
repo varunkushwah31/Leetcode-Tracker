@@ -1,23 +1,5 @@
-version: '3.8'
-
 services:
-  # 1. Database
-#  mongodb:
-#    image: mongo:latest
-#    container_name: leettracker-mongo
-#    ports:
-#      - "27017:27017"
-#    volumes:
-#      - mongo_data:/data/db
-#    restart: unless-stopped
-#    healthcheck:
-#      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
-#      interval: 10s
-#      timeout: 5s
-#      retries: 5
-#      start_period: 10s
-
-  # 2. Cache
+  # Redis
   redis:
     image: redis:latest
     container_name: leettracker-redis
@@ -30,35 +12,19 @@ services:
       timeout: 5s
       retries: 5
 
-  # 3. Spring Boot Backend
+  # Backend
   backend:
     build:
       context: .
     container_name: leettracker-backend
     ports:
-      - "8080:8080"
+      - "8081:8080"
     environment:
-      # EXACT MATCHES TO YOUR application.properties
-      - MONGO_URI=${MONGO_URI}
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
+      SPRING_DATA_MONGODB_URI: ${MONGO_URI}
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+      SPRING_DATA_REDIS_REPOSITORIES_ENABLED: "false"
     depends_on:
-#      mongodb:
-#        condition: service_healthy
       redis:
         condition: service_healthy
     restart: unless-stopped
-
-  # 4. React Frontend
-  frontend:
-    build:
-      context: ../LeetcodeTrackerFrontend
-    container_name: leettracker-frontend
-    ports:
-      - "5173:80"
-    depends_on:
-      - backend
-    restart: unless-stopped
-
-volumes:
-  mongo_data:

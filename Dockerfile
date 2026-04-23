@@ -17,10 +17,9 @@ FROM eclipse-temurin:25-jre
 WORKDIR /app
 
 # Copy the built jar from Stage 1
-COPY --from=build /app/target/*.jar app.jar
+COPY --from=build /app/target/tracker-0.0.1-SNAPSHOT.jar app.jar
 
 # Expose your backend port
 EXPOSE 8080
 
-# Run the app (Using sh -c to ensure environment variable expansion)
-ENTRYPOINT ["sh", "-c", "echo '=== MONGO_URI ===' && echo $MONGO_URI && exec java -Dspring.data.mongodb.uri=\"$MONGO_URI\" -jar app.jar"]
+ENTRYPOINT ["java", "-jar", "app.jar"]
