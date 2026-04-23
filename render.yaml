@@ -6,11 +6,8 @@ services:
     region: ohio
     envVars:
       - key: MONGO_URI
-        description: "MongoDB Atlas Connection String (e.g. mongodb+srv://...)"
+        description: "MongoDB Atlas Connection String"
         sync: false
-      - key: MONGO_DB
-        description: "The name of the database (e.g. LeetcodeTracker)"
-        value: "LeetcodeTracker"
       - key: REDIS_HOST
         fromService:
           name: leetcode-redis
