@@ -11,6 +11,7 @@ import com.tracker.leetcode.tracker.Repository.MentorRepository;
 import com.tracker.leetcode.tracker.Repository.StudentRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.context.annotation.Lazy;
@@ -39,7 +40,8 @@ public class ClassroomService {
     private final SimpMessagingTemplate messagingTemplate;
 
     @Lazy
-    private final ClassroomService self;
+    @Autowired
+    private ClassroomService self;
 
     // 1. Create Classroom
     @CacheEvict(value = {"classroom-dashboard", "classroom-analytics", "mentors-all", "mentor"}, allEntries = true)
