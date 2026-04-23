@@ -1,39 +1,29 @@
 services:
   - type: web
-    name: leetcode-tracker
+    name: leettracker-backend
     runtime: docker
     plan: free
-    region: ohio
+    region: singapore
     envVars:
-      - key: MONGO_URI
-        description: "MongoDB Atlas Connection String"
-        sync: false
-      - key: MONGO_DB
-        description: "The name of the database"
-        value: "LeetcodeTracker"
-      - key: REDIS_HOST
+      - key: SPRING_DATA_MONGODB_URI
+        sync: false # Set this in Render dashboard (Atlas URI)
+      - key: SPRING_DATA_REDIS_HOST
         fromService:
-          name: leetcode-redis
           type: redis
+          name: leettracker-redis
           property: host
-      - key: REDIS_PORT
+      - key: SPRING_DATA_REDIS_PORT
         fromService:
-          name: leetcode-redis
           type: redis
+          name: leettracker-redis
           property: port
+      - key: SPRING_DATA_REDIS_REPOSITORIES_ENABLED
+        value: "false"
       - key: JWT_SECRET
         generateValue: true
-      - key: GOOGLE_CLIENT_ID
-        sync: false
-      - key: GOOGLE_CLIENT_SECRET
-        sync: false
-      - key: MAIL_USERNAME
-        sync: false
-      - key: MAIL_PASSWORD
-        sync: false
 
   - type: redis
-    name: leetcode-redis
+    name: leettracker-redis
     plan: free
-    region: ohio
-    ipAllowList: [] # Only allow internal traffic from the backend
+    region: singapore
+    ipAllowList: [] # Only allow internal connections
