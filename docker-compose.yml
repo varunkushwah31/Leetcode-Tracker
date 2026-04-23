@@ -2,20 +2,20 @@ version: '3.8'
 
 services:
   # 1. Database
-#  mongodb:
-#    image: mongo:latest
-#    container_name: leettracker-mongo
-#    ports:
-#      - "27017:27017"
-#    volumes:
-#      - mongo_data:/data/db
-#    restart: unless-stopped
-#    healthcheck:
-#      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
-#      interval: 10s
-#      timeout: 5s
-#      retries: 5
-#      start_period: 10s
+  mongodb:
+    image: mongo:latest
+    container_name: leettracker-mongo
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
 
   # 2. Cache
   redis:
@@ -39,7 +39,7 @@ services:
       - "8080:8080"
     environment:
       # EXACT MATCHES TO YOUR application.properties
-      - MONGO_URI=${MONGO_URI}
+      - MONGO_URI=${MONGO_URI:-mongodb://mongodb:27017/LeetcodeTracker}
       - REDIS_HOST=redis
       - REDIS_PORT=6379
     depends_on:
