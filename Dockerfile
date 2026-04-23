@@ -23,4 +23,4 @@ COPY --from=build /app/target/*.jar app.jar
 EXPOSE 8080
 
 # Run the app (Using sh -c to ensure environment variable expansion)
-ENTRYPOINT ["sh", "-c", "java -Dspring.data.mongodb.uri=${MONGO_URI} -jar app.jar"]
+ENTRYPOINT ["java", "-jar", "app.jar"]
