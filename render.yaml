@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: leetcode-tracker
+    runtime: docker
+    plan: free
+    region: ohio
+    envVars:
+      - key: MONGO_URI
+        description: "MongoDB Atlas Connection String"
+        sync: false
+      - key: REDIS_HOST
+        sync: false
+      - key: REDIS_PORT
+        value: "6379"
+      - key: JWT_SECRET
+        generateValue: true
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
