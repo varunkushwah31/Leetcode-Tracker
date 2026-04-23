@@ -6,7 +6,6 @@ import io.swagger.v3.oas.annotations.info.Contact;
 import io.swagger.v3.oas.annotations.info.Info;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.security.SecurityScheme;
-import io.swagger.v3.oas.annotations.servers.Server;
 import org.springframework.context.annotation.Configuration;
 
 @Configuration
@@ -17,10 +16,6 @@ import org.springframework.context.annotation.Configuration;
         description = "API documentation for the LeetCode Tracker system",
         contact = @Contact(name = "Support", email = "support@leettracker.com")
     ),
-    servers = {
-        @Server(url = "http://localhost:8081", description = "Local Development"),
-        @Server(url = "https://your-app-name.onrender.com", description = "Production Server")
-    },
     security = @SecurityRequirement(name = "bearerAuth")
 )
 @SecurityScheme(
