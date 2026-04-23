@@ -9,12 +9,28 @@ services:
         description: "MongoDB Atlas Connection String"
         sync: false
       - key: REDIS_HOST
-        sync: false
+        fromService:
+          name: leetcode-redis
+          type: redis
+          property: host
       - key: REDIS_PORT
-        value: "6379"
+        fromService:
+          name: leetcode-redis
+          type: redis
+          property: port
       - key: JWT_SECRET
         generateValue: true
       - key: GOOGLE_CLIENT_ID
         sync: false
       - key: GOOGLE_CLIENT_SECRET
         sync: false
+      - key: MAIL_USERNAME
+        sync: false
+      - key: MAIL_PASSWORD
+        sync: false
+
+  - type: redis
+    name: leetcode-redis
+    plan: free
+    region: ohio
+    ipAllowList: [] # Only allow internal traffic from the backend
