@@ -14,7 +14,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/mentors")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "http://localhost:5173", allowCredentials = "true")
+@CrossOrigin(origins = {"http://localhost:5173", "http://localhost:5174"}, allowCredentials = "true")
 public class MentorController {
 
     private final MentorService mentorService;

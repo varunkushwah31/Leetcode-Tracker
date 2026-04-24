@@ -78,10 +78,11 @@ public class SecurityConfig {
 
         // Exactly match Vite frontend, Swagger UI, and Production
         configuration.setAllowedOrigins(List.of(
-            "http://localhost:5173",
-            "http://localhost:8081",
-            "http://localhost:8080",
-            "https://leettracker-backend.onrender.com"
+                "http://localhost:5173",
+                "http://localhost:5174",
+                "http://localhost:8081",
+                "http://localhost:8080",
+                "https://leettracker-backend.onrender.com"
         ));
 
         // Allow all standard HTTP methods, including OPTIONS

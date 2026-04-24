@@ -23,7 +23,7 @@ import org.springframework.http.HttpStatus;
 @RestController
 @RequestMapping("/api/classrooms")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "http://localhost:5173", allowCredentials = "true")
+@CrossOrigin(origins = {"http://localhost:5173", "http://localhost:5174"}, allowCredentials = "true")
 public class ClassroomController {
 
     private final ClassroomService classroomService;
