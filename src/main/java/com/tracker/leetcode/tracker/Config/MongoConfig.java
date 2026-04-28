@@ -21,6 +21,7 @@ public class MongoConfig {
         return new SimpleMongoClientDatabaseFactory(mongoUri);
     }
 
+
     @Bean
     public MongoTemplate mongoTemplate() {
         return new MongoTemplate(mongoDatabaseFactory());
