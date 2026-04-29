@@ -28,15 +28,41 @@ public class StudentService {
     }
 
     /**
+     * Core helper: Fetches ALL data from the optimized API client and saves to DB.
+     * Because our API now fetches everything in 1 call, we just update the whole student
+     * anytime any piece of data is requested!
+     */
+    private Student fetchAndSaveFullProfile(String username) {
+        Student dbStudent = getStudentOrThrow(username);
+
+        // 1. Fetch EVERYTHING from LeetCode in exactly ONE network request
+        Student freshData = leetCodeApiClient.fetchCompleteProfile(username);
+
+        // 2. Map the fresh data to our existing database entity
+        dbStudent.setAbout(freshData.getAbout());
+        dbStudent.setRank(freshData.getRank());
+        dbStudent.setAvatarUrl(freshData.getAvatarUrl());
+        dbStudent.setSocialMedia(freshData.getSocialMedia());
+        dbStudent.setCurrentContestRating(freshData.getCurrentContestRating());
+        dbStudent.setProgressHistory(freshData.getProgressHistory());
+        dbStudent.setProblemStats(freshData.getProblemStats());
+        dbStudent.setRecentSubmissions(freshData.getRecentSubmissions());
+        dbStudent.setSkills(freshData.getSkills());
+        dbStudent.setBadges(freshData.getBadges());
+        dbStudent.setContestHistory(freshData.getContestHistory());
+
+        // 3. Save to MongoDB
+        return studentRepository.save(dbStudent);
+    }
+
+    /**
      * Fetches and updates student progress (calendar heatmap)
      * Results are cached for 30 minutes
      */
     @Cacheable(value = "student-progress", key = "#username")
     public Student fetchAndUpdateStudentProgress(String username) {
         log.info("Updating calendar heatmap for user: {}", username);
-        Student student = getStudentOrThrow(username);
-        student.setProgressHistory(leetCodeApiClient.fetchCalendarData(username));
-        return studentRepository.save(student);
+        return fetchAndSaveFullProfile(username);
     }
 
     /**
@@ -46,9 +72,7 @@ public class StudentService {
     @Cacheable(value = "student-stats", key = "#username")
     public Student fetchAndUpdateProblemStats(String username) {
         log.info("Updating problem stats for user: {}", username);
-        Student student = getStudentOrThrow(username);
-        student.setProblemStats(leetCodeApiClient.fetchProblemStats(username));
-        return studentRepository.save(student);
+        return fetchAndSaveFullProfile(username);
     }
 
     /**
@@ -58,9 +82,7 @@ public class StudentService {
     @Cacheable(value = "student-recent", key = "#username")
     public Student fetchAndUpdateRecentSubmissions(String username) {
         log.info("Updating recent submissions for user: {}", username);
-        Student student = getStudentOrThrow(username);
-        student.setRecentSubmissions(leetCodeApiClient.fetchRecentSubmissions(username, 5));
-        return studentRepository.save(student);
+        return fetchAndSaveFullProfile(username);
     }
 
     /**
@@ -70,50 +92,19 @@ public class StudentService {
     @Cacheable(value = "student-profile", key = "#username")
     public Student fetchAndUpdateExtendedProfile(String username) {
         log.info("Updating extended profile (Socials, Contests, Badges) for user: {}", username);
-        Student student = getStudentOrThrow(username);
-
-        Student extendedData = leetCodeApiClient.fetchExtendedProfileDetails(username);
-
-        student.setAbout(extendedData.getAbout());
-        student.setRank(extendedData.getRank());
-        student.setCurrentContestRating(extendedData.getCurrentContestRating());
-        student.setSocialMedia(extendedData.getSocialMedia());
-        student.setBadges(extendedData.getBadges());
-        student.setContestHistory(extendedData.getContestHistory());
-        student.setAvatarUrl(extendedData.getAvatarUrl());
-        student.setSkills(leetCodeApiClient.fetchSkillStats(username));
-
-        return studentRepository.save(student);
+        return fetchAndSaveFullProfile(username);
     }
 
     /**
      * Syncs all profile data and clears related caches to ensure fresh data
      */
     @Caching(evict = {
-            // 1. Clear this specific student's personal data
             @CacheEvict(value = {"student-progress", "student-stats", "student-recent", "student-profile"}, key = "#username"),
-            // 2. Blast away all classroom caches so they rebuild with this new fresh data!
             @CacheEvict(value = {"classroom-dashboard", "classroom-analytics"}, allEntries = true)
     })
     public Student syncAllProfileData(String username) {
-        log.info("Performing FULL profile sync for user: {}", username);
-        Student student = getStudentOrThrow(username);
-
-        student.setProgressHistory(leetCodeApiClient.fetchCalendarData(username));
-        student.setProblemStats(leetCodeApiClient.fetchProblemStats(username));
-        student.setRecentSubmissions(leetCodeApiClient.fetchRecentSubmissions(username, 20));
-        student.setSkills(leetCodeApiClient.fetchSkillStats(username));
-
-        Student extendedData = leetCodeApiClient.fetchExtendedProfileDetails(username);
-        student.setAbout(extendedData.getAbout());
-        student.setRank(extendedData.getRank());
-        student.setCurrentContestRating(extendedData.getCurrentContestRating());
-        student.setSocialMedia(extendedData.getSocialMedia());
-        student.setBadges(extendedData.getBadges());
-        student.setContestHistory(extendedData.getContestHistory());
-        student.setAvatarUrl(extendedData.getAvatarUrl());
-
-        return studentRepository.save(student);
+        log.info("Performing FULL optimized profile sync for user: {}", username);
+        return fetchAndSaveFullProfile(username);
     }
 
     /**

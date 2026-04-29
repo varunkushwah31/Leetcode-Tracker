@@ -26,10 +26,10 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 @Slf4j
-@Component // Tells Spring to manage this class as a reusable tool
+@Component
 public class LeetCodeApiClient {
 
-    private final String LEETCODE_API_URL = "https://leetcode.com/graphql";
+    private static final String LEETCODE_API_URL = "https://leetcode.com/graphql";
     private final RestTemplate restTemplate = new RestTemplate();
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final HttpHeaders headers;
@@ -40,7 +40,6 @@ public class LeetCodeApiClient {
         headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
     }
-
 
     private JsonNode executeGraphQLQuery(String query, String username) {
         try {
@@ -75,14 +74,14 @@ public class LeetCodeApiClient {
 
     /**
      * Retrieve fallback data from Redis cache
-     * Used when circuit breaker is OPEN to serve stale data
+     * Safely casts the object using the provided Class type to avoid unchecked warnings
      */
     private <T> T getFallbackDataFromCache(String key, Class<T> type) {
         try {
             Object cached = redisTemplate.opsForValue().get(key);
-            if (cached != null) {
+            if (type.isInstance(cached)) {
                 log.info("Using fallback data from Redis cache: {}", key);
-                return (T) cached;
+                return type.cast(cached);
             }
         } catch (Exception e) {
             log.warn("Failed to retrieve fallback data from cache: {}", e.getMessage());
@@ -90,266 +89,148 @@ public class LeetCodeApiClient {
         return null;
     }
 
-    // 1. Fetch Calendar Heatmap Data
-    @CircuitBreaker(name = "leetcodeApi", fallbackMethod = "fetchCalendarDataFallback")
+    // 1. THE MASTER SYNC METHOD (Replaces 5 separate calls!)
+    @CircuitBreaker(name = "leetcodeApi", fallbackMethod = "fetchCompleteProfileFallback")
     @Retry(name = "leetcodeApi")
     @RateLimiter(name = "leetcodeApi")
-    public List<DailyProgress> fetchCalendarData(String username) {
+    public Student fetchCompleteProfile(String username) {
         String query = """
-                {"query":"query userProfileCalendar($username: String!) { matchedUser(username: $username) { userCalendar { submissionCalendar } } }","variables":{"username":"%s"}}
-                """.formatted(username);
-
-        JsonNode root = executeGraphQLQuery(query, username);
-        JsonNode calendarNode = root.path("data").path("matchedUser").path("userCalendar").path("submissionCalendar");
-
-        if (calendarNode.isMissingNode() || calendarNode.isNull()) {
-            throw new LeetCodeApiException("LeetCode returned no calendar data for user: " + username);
-        }
-
-        try {
-            Map<String, Integer> submissionMap = objectMapper.readValue(calendarNode.asString(), new TypeReference<>() {});
-            List<DailyProgress> progressList = new ArrayList<>();
-
-            for (Map.Entry<String, Integer> entry : submissionMap.entrySet()) {
-                LocalDate date = Instant.ofEpochSecond(Long.parseLong(entry.getKey())).atZone(ZoneId.systemDefault()).toLocalDate();
-                progressList.add(new DailyProgress(date, entry.getValue()));
-            }
-
-            // Cache for fallback
-            cacheDataForFallback("leetcode:calendar:" + username, progressList);
-            return progressList;
-        } catch (Exception e) {
-            log.error("Failed to map Calendar data for {}: {}", username, e.getMessage());
-            throw new LeetCodeApiException("Error parsing LeetCode calendar data.");
-        }
-    }
-
-    /**
-     * Fallback method when circuit is OPEN - serves stale data from Redis
-     */
-    public List<DailyProgress> fetchCalendarDataFallback(String username, Exception ex) {
-        log.warn("Circuit breaker OPEN for calendar data of {}. Serving stale data from cache. Error: {}",
-                username, ex.getMessage());
-        List<DailyProgress> cached = getFallbackDataFromCache("leetcode:calendar:" + username, List.class);
-        if (cached != null) {
-            return cached;
-        }
-        throw new LeetCodeApiException("LeetCode API is temporarily unavailable and no cached data exists for user: " + username);
-    }
-
-    // 2. Fetch Problem Stats Data
-    @CircuitBreaker(name = "leetcodeApi", fallbackMethod = "fetchProblemStatsFallback")
-    @Retry(name = "leetcodeApi")
-    @RateLimiter(name = "leetcodeApi")
-    public List<ProblemStats> fetchProblemStats(String username) {
-        String query = """
-                {"query":"query userProblemsSolved($username: String!) { allQuestionsCount { difficulty count } matchedUser(username: $username) { problemsSolvedBeatsStats { difficulty percentage } submitStatsGlobal { acSubmissionNum { difficulty count } } } }","variables":{"username":"%s"}}
-                """.formatted(username);
-
-        JsonNode root = executeGraphQLQuery(query, username);
-        JsonNode matchedUser = root.path("data").path("matchedUser");
-
-        if (matchedUser.isMissingNode() || matchedUser.isNull()) {
-            throw new LeetCodeApiException("LeetCode returned no stats data for user: " + username);
-        }
-
-        JsonNode submissionStats = matchedUser.path("submitStatsGlobal").path("acSubmissionNum");
-        JsonNode beatsStats = matchedUser.path("problemsSolvedBeatsStats");
-        List<ProblemStats> statsList = new ArrayList<>();
-
-        if (submissionStats != null && submissionStats.isArray()) {
-            for (JsonNode statNode : submissionStats) {
-                String difficulty = statNode.path("difficulty").asString();
-                int count = statNode.path("count").asInt();
-                double percentage = 0.0;
-
-                if (beatsStats != null && beatsStats.isArray()) {
-                    for (JsonNode beatNode : beatsStats) {
-                        if (beatNode.path("difficulty").asString().equals(difficulty) && !beatNode.path("percentage").isNull()) {
-                            percentage = beatNode.path("percentage").asDouble();
-                            break;
-                        }
-                    }
-                }
-                statsList.add(new ProblemStats(difficulty, count, percentage));
-            }
-        }
-
-        // Cache for fallback
-        cacheDataForFallback("leetcode:stats:" + username, statsList);
-        return statsList;
-    }
-
-    /**
-     * Fallback method when circuit is OPEN - serves stale stats from Redis
-     */
-    public List<ProblemStats> fetchProblemStatsFallback(String username, Exception ex) {
-        log.warn("Circuit breaker OPEN for stats of {}. Serving stale data from cache. Error: {}",
-                username, ex.getMessage());
-        List<ProblemStats> cached = getFallbackDataFromCache("leetcode:stats:" + username, List.class);
-        if (cached != null) {
-            return cached;
-        }
-        throw new LeetCodeApiException("LeetCode API is temporarily unavailable and no cached data exists for user: " + username);
-    }
-
-    // 3. Fetch Recent Submissions Data
-    @CircuitBreaker(name = "leetcodeApi", fallbackMethod = "fetchRecentSubmissionsFallback")
-    @Retry(name = "leetcodeApi")
-    @RateLimiter(name = "leetcodeApi")
-    public List<RecentSubmission> fetchRecentSubmissions(String username, int limit) {
-        String query = """
-                {"query":"query recentAcSubmissions($username: String!, $limit: Int!) { recentAcSubmissionList(username: $username, limit: $limit) { id title titleSlug timestamp } }","variables":{"username":"%s","limit":%d}}
-                """.formatted(username, limit);
-
-        JsonNode root = executeGraphQLQuery(query, username);
-        JsonNode submissionList = root.path("data").path("recentAcSubmissionList");
-
-        if (submissionList.isMissingNode() || submissionList.isNull()) {
-            log.warn("LeetCode returned no recent submissions for user: {}", username);
-            return new ArrayList<>();
-        }
-
-        List<RecentSubmission> recentList = new ArrayList<>();
-        if (submissionList.isArray()) {
-            for (JsonNode node : submissionList) {
-                try {
-                    String title = node.path("title").asString();
-                    String titleSlug = node.path("titleSlug").asString();
-                    long timestamp = Long.parseLong(node.path("timestamp").asString());
-                    recentList.add(new RecentSubmission(title, titleSlug, timestamp));
-                } catch (Exception e) {
-                    log.warn("Failed to parse recent submission entry for user {}: {}", username, e.getMessage());
-                    // Continue parsing remaining entries
-                }
-            }
-        }
-
-        // Cache for fallback
-        cacheDataForFallback("leetcode:recent:" + username, recentList);
-        return recentList;
-    }
-
-    /**
-     * Fallback method when circuit is OPEN - serves stale submissions from Redis
-     */
-    public List<RecentSubmission> fetchRecentSubmissionsFallback(String username, int limit, Exception ex) {
-        log.warn("Circuit breaker OPEN for recent submissions of {}. Serving stale data from cache. Error: {}",
-                username, ex.getMessage());
-        List<RecentSubmission> cached = getFallbackDataFromCache("leetcode:recent:" + username, List.class);
-        if (cached != null) {
-            return cached;
-        }
-        throw new LeetCodeApiException("LeetCode API is temporarily unavailable and no cached data exists for user: " + username);
-    }
-
-    // 4. Fetch Extended Profile (Badges, Socials, Contests, Rank, About, AVATAR)
-    @CircuitBreaker(name = "leetcodeApi", fallbackMethod = "fetchExtendedProfileDetailsFallback")
-    @Retry(name = "leetcodeApi")
-    @RateLimiter(name = "leetcodeApi")
-    public Student fetchExtendedProfileDetails(String username) {
-        // ADDED 'userAvatar' TO THE GRAPHQL QUERY
-        String query = """
-                {"query":"query fullProfile($username: String!) { matchedUser(username: $username) { githubUrl twitterUrl linkedinUrl profile { ranking aboutMe userAvatar } badges { name icon creationDate } } userContestRanking(username: $username) { rating } userContestRankingHistory(username: $username) { attended rating ranking problemsSolved totalProblems contest { title startTime } } }","variables":{"username":"%s"}}
+                {"query":"query fullProfileSync($username: String!, $limit: Int!) { allQuestionsCount { difficulty count } matchedUser(username: $username) { githubUrl twitterUrl linkedinUrl profile { ranking aboutMe userAvatar } badges { name icon creationDate } userCalendar { submissionCalendar } problemsSolvedBeatsStats { difficulty percentage } submitStatsGlobal { acSubmissionNum { difficulty count } } tagProblemCounts { advanced { tagName problemsSolved } intermediate { tagName problemsSolved } fundamental { tagName problemsSolved } } } userContestRanking(username: $username) { rating } userContestRankingHistory(username: $username) { attended rating ranking problemsSolved totalProblems contest { title startTime } } recentAcSubmissionList(username: $username, limit: $limit) { id title titleSlug timestamp } }","variables":{"username":"%s","limit":20}}
                 """.formatted(username);
 
         JsonNode root = executeGraphQLQuery(query, username);
         JsonNode data = root.path("data");
+        JsonNode matchedUser = data.path("matchedUser");
 
-        if (data.path("matchedUser").isNull() || data.path("matchedUser").isMissingNode()) {
-            throw new LeetCodeApiException("LeetCode returned no extended profile data for user: " + username);
+        if (matchedUser.isMissingNode() || matchedUser.isNull()) {
+            throw new LeetCodeApiException("LeetCode returned no data for user: " + username);
         }
 
-        Student extendedData = new Student();
-        JsonNode matchedUser = data.path("matchedUser");
+        Student student = new Student();
         JsonNode profile = matchedUser.path("profile");
 
-        // 1. Parse Central Fields, Avatar, & Social Media
-        extendedData.setAbout(profile.path("aboutMe").asString(null));
-        extendedData.setRank(profile.path("ranking").asString("Unranked"));
-        extendedData.setAvatarUrl(profile.path("userAvatar").asString(null)); // <-- CAPTURE THE AVATAR!
-
-        extendedData.setSocialMedia(new SocialMedia(
+        // --- 1. Basic Profile & Socials ---
+        student.setAbout(profile.path("aboutMe").asString(null));
+        student.setRank(profile.path("ranking").asString("Unranked"));
+        student.setAvatarUrl(profile.path("userAvatar").asString(null));
+        student.setSocialMedia(new SocialMedia(
                 matchedUser.path("githubUrl").asString(null),
                 matchedUser.path("linkedinUrl").asString(null),
                 matchedUser.path("twitterUrl").asString(null)
         ));
 
-        // Parse Current Contest Rating
         JsonNode rankingNode = data.path("userContestRanking");
         if (!rankingNode.isNull() && !rankingNode.isMissingNode()) {
-            extendedData.setCurrentContestRating(rankingNode.path("rating").asDouble(0.0));
+            student.setCurrentContestRating(rankingNode.path("rating").asDouble(0.0));
         }
 
-        // 2. Parse Badges
+        // --- 2. Calendar / Heatmap ---
+        try {
+            JsonNode calendarNode = matchedUser.path("userCalendar").path("submissionCalendar");
+            if (!calendarNode.isMissingNode() && !calendarNode.isNull()) {
+                Map<String, Integer> submissionMap = objectMapper.readValue(calendarNode.asString(), new TypeReference<>() {});
+                List<DailyProgress> progressList = new ArrayList<>();
+                for (Map.Entry<String, Integer> entry : submissionMap.entrySet()) {
+                    LocalDate date = Instant.ofEpochSecond(Long.parseLong(entry.getKey())).atZone(ZoneId.systemDefault()).toLocalDate();
+                    progressList.add(new DailyProgress(date, entry.getValue()));
+                }
+                student.setProgressHistory(progressList);
+            }
+        } catch (Exception e) { log.warn("Failed to parse calendar for {}", username); }
+
+        // --- 3. Problem Stats ---
+        JsonNode submissionStats = matchedUser.path("submitStatsGlobal").path("acSubmissionNum");
+        JsonNode beatsStats = matchedUser.path("problemsSolvedBeatsStats");
+        List<ProblemStats> statsList = new ArrayList<>();
+        if (submissionStats.isArray()) {
+            for (JsonNode statNode : submissionStats) {
+                String diff = statNode.path("difficulty").asString();
+                int count = statNode.path("count").asInt();
+                double pct = 0.0;
+                if (beatsStats.isArray()) {
+                    for (JsonNode beatNode : beatsStats) {
+                        if (beatNode.path("difficulty").asString().equals(diff) && !beatNode.path("percentage").isNull()) {
+                            pct = beatNode.path("percentage").asDouble();
+                            break;
+                        }
+                    }
+                }
+                statsList.add(new ProblemStats(diff, count, pct));
+            }
+        }
+        student.setProblemStats(statsList);
+
+        // --- 4. Recent Submissions ---
+        JsonNode subList = data.path("recentAcSubmissionList");
+        List<RecentSubmission> recentList = new ArrayList<>();
+        if (subList.isArray()) {
+            for (JsonNode node : subList) {
+                try {
+                    recentList.add(new RecentSubmission(
+                            node.path("title").asString(),
+                            node.path("titleSlug").asString(),
+                            Long.parseLong(node.path("timestamp").asString())
+                    ));
+                } catch (Exception ignored) {}
+            }
+        }
+        student.setRecentSubmissions(recentList);
+
+        // --- 5. Skills (Topics) ---
+        List<SkillStat> skills = new ArrayList<>();
+        JsonNode tagCounts = matchedUser.path("tagProblemCounts");
+        if (!tagCounts.isMissingNode() && !tagCounts.isNull()) {
+            for (String level : new String[]{"fundamental", "intermediate", "advanced"}) {
+                JsonNode levelNode = tagCounts.path(level);
+                if (levelNode.isArray()) {
+                    for (JsonNode tag : levelNode) {
+                        skills.add(new SkillStat(tag.path("tagName").asString(), tag.path("problemsSolved").asInt()));
+                    }
+                }
+            }
+        }
+        student.setSkills(skills);
+
+        // --- 6. Badges & Contests ---
         List<Badge> badgeList = new ArrayList<>();
         JsonNode badgesNode = matchedUser.path("badges");
-        if (badgesNode != null && badgesNode.isArray()) {
+        if (badgesNode.isArray()) {
             for (JsonNode b : badgesNode) {
-                try {
-                    badgeList.add(new Badge(
-                            b.path("name").asString(),
-                            b.path("icon").asString(),
-                            b.path("creationDate").asString()
-                    ));
-                } catch (Exception e) {
-                    log.warn("Failed to parse badge for user {}: {}", username, e.getMessage());
-                }
+                badgeList.add(new Badge(b.path("name").asString(), b.path("icon").asString(), b.path("creationDate").asString()));
             }
         }
-        extendedData.setBadges(badgeList);
+        student.setBadges(badgeList);
 
-        // 3. Parse Contest History
         List<ContestHistory> historyList = new ArrayList<>();
         JsonNode historyNode = data.path("userContestRankingHistory");
-        if (historyNode != null && historyNode.isArray()) {
+        if (historyNode.isArray()) {
             for (JsonNode c : historyNode) {
-                try {
-                    if (c.path("attended").asBoolean()) {
-                        JsonNode contestMeta = c.path("contest");
-                        historyList.add(new ContestHistory(
-                                contestMeta.path("title").asString(),
-                                contestMeta.path("startTime").asLong(),
-                                c.path("rating").asDouble(),
-                                c.path("ranking").asInt(),
-                                c.path("problemsSolved").asInt(),
-                                c.path("totalProblems").asInt()
-                        ));
-                    }
-                } catch (Exception e) {
-                    log.warn("Failed to parse contest history entry for user {}: {}", username, e.getMessage());
+                if (c.path("attended").asBoolean()) {
+                    JsonNode meta = c.path("contest");
+                    historyList.add(new ContestHistory(meta.path("title").asString(), meta.path("startTime").asLong(), c.path("rating").asDouble(), c.path("ranking").asInt(), c.path("problemsSolved").asInt(), c.path("totalProblems").asInt()));
                 }
             }
         }
-        extendedData.setContestHistory(historyList);
+        student.setContestHistory(historyList);
 
-        // Cache for fallback
-        cacheDataForFallback("leetcode:profile:" + username, extendedData);
-        return extendedData;
+        cacheDataForFallback("LeetCode:master:" + username, student);
+        return student;
     }
 
-    /**
-     * Fallback method when circuit is OPEN - serves stale profile from Redis
-     */
-    public Student fetchExtendedProfileDetailsFallback(String username, Exception ex) {
-        log.warn("Circuit breaker OPEN for extended profile of {}. Serving stale data from cache. Error: {}",
-                username, ex.getMessage());
-        Student cached = getFallbackDataFromCache("leetcode:profile:" + username, Student.class);
-        if (cached != null) {
-            return cached;
-        }
-        throw new LeetCodeApiException("LeetCode API is temporarily unavailable and no cached data exists for user: " + username);
+    @SuppressWarnings("unused") // Called via AOP by Resilience4j
+    public Student fetchCompleteProfileFallback(String username, Exception ex) {
+        log.warn("Circuit breaker OPEN for {}. Serving stale master data. Error: {}", username, ex.getMessage());
+        Student cached = getFallbackDataFromCache("LeetCode:master:" + username, Student.class);
+        if (cached != null) return cached;
+        throw new LeetCodeApiException("API unavailable and no cached data for: " + username);
     }
 
-    // 5. Verify Manual Submission URL (Bypassing Privacy Block)
-
+    // 2. Verify Manual Submission URL (Bypassing Privacy Block)
     @CircuitBreaker(name = "leetcodeApi", fallbackMethod = "verifySubmissionFallback")
     @Retry(name = "leetcodeApi")
     @RateLimiter(name = "leetcodeApi")
     public boolean verifySubmission(String submissionId, String expectedUsername, String expectedTitleSlug) {
 
-        // Instead of querying the protected submissionDetails, we query the public recentAcSubmissionList
-        // We fetch their last 20 accepted submissions to see if the ID is in there.
         String query = """
                 {"query":"query recentAcSubmissions($username: String!, $limit: Int!) { recentAcSubmissionList(username: $username, limit: $limit) { id titleSlug } }","variables":{"username":"%s","limit":20}}
                 """.formatted(expectedUsername);
@@ -363,18 +244,15 @@ public class LeetCodeApiClient {
         }
 
         try {
-            // Loop through their recent accepted submissions looking for a match
             for (JsonNode node : submissionList) {
                 String actualId = node.path("id").asString();
                 String actualSlug = node.path("titleSlug").asString();
 
-                // If the ID matches AND the question matches, it's 100% valid!
                 if (submissionId.equals(actualId) && expectedTitleSlug.equalsIgnoreCase(actualSlug)) {
                     log.info("Validation Successful -> Found ID: {} for Slug: {}", actualId, actualSlug);
                     return true;
                 }
             }
-
             log.warn("Submission ID {} not found in the recent 20 Accepted submissions for {}.", submissionId, expectedUsername);
             return false;
 
@@ -384,72 +262,10 @@ public class LeetCodeApiClient {
         }
     }
 
-    /**
-     * Fallback for submission verification - returns false to deny verification during API outage
-     */
+    @SuppressWarnings("unused") // Called via AOP by Resilience4j
     public boolean verifySubmissionFallback(String submissionId, String expectedUsername, String expectedTitleSlug, Exception ex) {
         log.warn("Circuit breaker OPEN for submission verification of {}. Denying verification during outage. Error: {}",
                 expectedUsername, ex.getMessage());
-        // During API outage, we cannot verify submissions, so return false (deny)
         return false;
-    }
-
-    // 6. Fetch Skill Stats (Topic Tags)
-    @CircuitBreaker(name = "leetcodeApi", fallbackMethod = "fetchSkillStatsFallback")
-    @Retry(name = "leetcodeApi")
-    @RateLimiter(name = "leetcodeApi")
-    public List<SkillStat> fetchSkillStats(String username) {
-        // LeetCode's exact GraphQL query to get problems solved by topic tag
-        String query = """
-                {"query":"query skillStats($username: String!) { matchedUser(username: $username) { tagProblemCounts { advanced { tagName problemsSolved } intermediate { tagName problemsSolved } fundamental { tagName problemsSolved } } } }","variables":{"username":"%s"}}
-                """.formatted(username);
-
-        JsonNode root = executeGraphQLQuery(query, username);
-        JsonNode tagCounts = root.path("data").path("matchedUser").path("tagProblemCounts");
-
-        List<SkillStat> skills = new ArrayList<>();
-
-        // If the user has a hidden profile or hasn't solved anything, return empty list
-        if (tagCounts.isMissingNode() || tagCounts.isNull()) {
-            log.debug("No skill data available for user: {}", username);
-            return skills;
-        }
-
-        // LeetCode splits tags into 3 difficulty tiers. We will combine them all.
-        String[] levels = {"fundamental", "intermediate", "advanced"};
-        for (String level : levels) {
-            JsonNode levelNode = tagCounts.path(level);
-            if (levelNode != null && levelNode.isArray()) {
-                for (JsonNode tag : levelNode) {
-                    try {
-                        skills.add(new SkillStat(
-                                tag.path("tagName").asString(),
-                                tag.path("problemsSolved").asInt()
-                        ));
-                    } catch (Exception e) {
-                        log.warn("Failed to parse skill stat for level {} and user {}: {}", level, username, e.getMessage());
-                    }
-                }
-            }
-        }
-
-        // Cache for fallback
-        cacheDataForFallback("leetcode:skills:" + username, skills);
-        return skills;
-    }
-
-    /**
-     * Fallback method when circuit is OPEN - serves stale skills from Redis
-     */
-    public List<SkillStat> fetchSkillStatsFallback(String username, Exception ex) {
-        log.warn("Circuit breaker OPEN for skill stats of {}. Serving stale data from cache. Error: {}",
-                username, ex.getMessage());
-        List<SkillStat> cached = getFallbackDataFromCache("leetcode:skills:" + username, List.class);
-        if (cached != null) {
-            return cached;
-        }
-        // Return empty list instead of throwing exception - skills are not critical
-        log.info("No cached skill data available, returning empty list for: {}", username);
-        return new ArrayList<>();
     }
 }
