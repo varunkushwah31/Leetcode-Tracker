@@ -11,6 +11,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 
 @Slf4j
 @Component
@@ -30,8 +31,15 @@ public class LeetcodeScheduler {
     public void updateAllStudentsDaily() {
         log.info("Executing ShedLock protected Daily Sync...");
         List<Student> students = studentRepository.findAll();
-        for (Student student : students) {
-            studentService.syncProfileAsync(student.getLeetcodeUsername());
-        }
+
+        // 1. Collect all the futures
+        List<CompletableFuture<Void>> futures = students.stream()
+                .map(student -> studentService.syncProfileAsync(student.getLeetcodeUsername()))
+                .toList();
+
+        // 2. Wait for EVERY background thread to finish before releasing the lock
+        CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
+
+        log.info("Daily Sync completely finished for all students!");
     }
 }
