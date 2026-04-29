@@ -7,6 +7,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
@@ -88,8 +89,12 @@ public class StudentService {
     /**
      * Syncs all profile data and clears related caches to ensure fresh data
      */
-    @CacheEvict(value = {"student-progress", "student-stats", "student-recent", "student-profile"},
-                key = "#username")
+    @Caching(evict = {
+            // 1. Clear this specific student's personal data
+            @CacheEvict(value = {"student-progress", "student-stats", "student-recent", "student-profile"}, key = "#username"),
+            // 2. Blast away all classroom caches so they rebuild with this new fresh data!
+            @CacheEvict(value = {"classroom-dashboard", "classroom-analytics"}, allEntries = true)
+    })
     public Student syncAllProfileData(String username) {
         log.info("Performing FULL profile sync for user: {}", username);
         Student student = getStudentOrThrow(username);
