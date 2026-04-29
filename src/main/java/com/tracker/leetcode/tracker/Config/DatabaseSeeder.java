@@ -6,6 +6,7 @@ import com.tracker.leetcode.tracker.Models.Role;
 import com.tracker.leetcode.tracker.Repository.MentorRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jspecify.annotations.NonNull;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
@@ -21,7 +22,7 @@ public class DatabaseSeeder implements CommandLineRunner {
     private final PasswordEncoder passwordEncoder;
 
     @Override
-    public void run(String... args) throws Exception {
+    public void run(String @NonNull ... args) throws Exception {
         // 1. Check if ANY Super Admin exists in the database
         boolean adminExists = mentorRepository.findAll().stream()
                 .anyMatch(mentor -> mentor.getRole() == Role.SUPER_ADMIN);
@@ -32,7 +33,7 @@ public class DatabaseSeeder implements CommandLineRunner {
 
             Mentor defaultAdmin = Mentor.builder()
                     .name("Master Admin")
-                    .email("admin@leettracker.com")
+                    .email("admin@mentorsync.com")
                     .password(passwordEncoder.encode("Admin123!"))
                     .role(Role.SUPER_ADMIN)
                     .enabled(true) // <-- Explicitly enable it
@@ -43,7 +44,7 @@ public class DatabaseSeeder implements CommandLineRunner {
             //
             mentorRepository.save(defaultAdmin);
             log.info("Default SUPER_ADMIN created successfully!");
-            log.info("Email: admin@leettracker.com | Password: Admin123!");
+            log.info("Email: admin@mentorsync.com | Password: Admin123!");
         } else {
             log.info("SUPER_ADMIN account already exists. Skipping bootstrap process.");
         }

@@ -38,7 +38,7 @@ public class EmailService {
             message.setSubject("Reminder: Pending LeetCode Assignment for " + className);
             message.setText("Hi " + studentName + ",\n\n" +
                     "This is a gentle reminder from your mentor that you have a pending assignment: '" + assignmentName + "'.\n\n" +
-                    "Please complete it on LeetCode and validate it on your LeetTracker dashboard as soon as possible.\n\n" +
+                    "Please complete it on LeetCode and validate it on your MentorSync dashboard as soon as possible.\n\n" +
                     "Happy Coding!");
 
             mailSender.send(message);

@@ -2,7 +2,7 @@ services:
   # Redis
   redis:
     image: redis:latest
-    container_name: leettracker-redis
+    container_name: mentorsync-redis
     ports:
       - "6379:6379"
     restart: unless-stopped
@@ -16,7 +16,7 @@ services:
   backend:
     build:
       context: .
-    container_name: leettracker-backend
+    container_name: mentorsync-backend
     ports:
       - "8081:8080"
     environment:

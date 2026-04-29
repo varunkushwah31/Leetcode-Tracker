@@ -1,6 +1,6 @@
 package com.tracker.leetcode.tracker.Security;
 
-import com.tracker.leetcode.tracker.Exception.ErrorResponse;
+import com.tracker.leetcode.tracker.Exception.ApiErrorResponse;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -16,7 +16,6 @@ import tools.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
 import java.io.OutputStream;
-import java.time.LocalDateTime;
 
 @Component
 @RequiredArgsConstructor
@@ -29,12 +28,13 @@ public class CustomAuthenticationEntryPoint implements AuthenticationEntryPoint 
     public void commence(@NonNull HttpServletRequest request, HttpServletResponse response, @NonNull AuthenticationException authException)
             throws IOException, ServletException {
 
-        ErrorResponse errorResponse = new ErrorResponse(
-                LocalDateTime.now(),
-                HttpStatus.UNAUTHORIZED.value(),
-                "Unauthorized",
-                "Missing, invalid, or expired authentication token."
-        );
+        // Use our new ApiErrorResponse with the Builder pattern
+        ApiErrorResponse errorResponse = ApiErrorResponse.builder()
+                .status(HttpStatus.UNAUTHORIZED.value())
+                .error("Unauthorized")
+                .message("Missing, invalid, or expired authentication token.")
+                .path(request.getRequestURI())
+                .build();
 
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
         response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);

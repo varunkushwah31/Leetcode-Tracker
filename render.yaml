@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: leettracker-backend
+    name: mentorsync-backend
     runtime: docker
     plan: free
     region: singapore
@@ -10,12 +10,12 @@ services:
       - key: SPRING_DATA_REDIS_HOST
         fromService:
           type: redis
-          name: leettracker-redis
+          name: mentorsync-redis
           property: host
       - key: SPRING_DATA_REDIS_PORT
         fromService:
           type: redis
-          name: leettracker-redis
+          name: mentorsync-redis
           property: port
       - key: SPRING_DATA_REDIS_REPOSITORIES_ENABLED
         value: "false"
@@ -23,7 +23,7 @@ services:
         generateValue: true
 
   - type: redis
-    name: leettracker-redis
+    name: mentorsync-redis
     plan: free
     region: singapore
     ipAllowList: [] # Only allow internal connections

@@ -14,7 +14,7 @@ import org.springframework.context.annotation.Configuration;
         title = "LeetCode Tracker API",
         version = "1.0",
         description = "API documentation for the LeetCode Tracker system",
-        contact = @Contact(name = "Support", email = "support@leettracker.com")
+        contact = @Contact(name = "Support", email = "support@mentorsync.com")
     ),
     security = @SecurityRequirement(name = "bearerAuth")
 )

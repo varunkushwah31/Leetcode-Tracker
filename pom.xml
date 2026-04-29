@@ -10,8 +10,8 @@
 	<groupId>com.tracker.leetcode</groupId>
 	<artifactId>tracker</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
-	<name>tracker</name>
-	<description>LeetCode Tracker</description>
+	<name>MentorSync</name>
+	<description>MentorSync - Student Progress Platform</description>
 
 	<properties>
 		<java.version>24</java.version>

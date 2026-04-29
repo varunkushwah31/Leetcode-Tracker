@@ -1,5 +1,6 @@
 package com.tracker.leetcode.tracker.Exception;
 
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -9,32 +10,33 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
-import java.time.LocalDateTime;
-
 @Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    private ResponseEntity<ErrorResponse> buildErrorResponse(HttpStatus status, String error, String message) {
-        ErrorResponse errorResponse = new ErrorResponse(
-                LocalDateTime.now(),
-                status.value(),
-                error,
-                message
-        );
+    // Updated helper method utilizing the Builder pattern and the request path
+    private ResponseEntity<ApiErrorResponse> buildErrorResponse(HttpStatus status, String error, String message, String path) {
+        ApiErrorResponse errorResponse = ApiErrorResponse.builder()
+                .status(status.value())
+                .error(error)
+                .message(message)
+                .path(path)
+                .build();
+        // Timestamp is handled automatically by your @Builder.Default annotation!
+
         return new ResponseEntity<>(errorResponse, status);
     }
 
     @ExceptionHandler(BadCredentialsException.class)
-    public ResponseEntity<ErrorResponse> handleBadCredentials(BadCredentialsException ex) {
+    public ResponseEntity<ApiErrorResponse> handleBadCredentials(BadCredentialsException ex, HttpServletRequest request) {
         log.warn("Failed login attempt: {}", ex.getMessage());
-        return buildErrorResponse(HttpStatus.UNAUTHORIZED, "Unauthorized", "Invalid email or password.");
+        return buildErrorResponse(HttpStatus.UNAUTHORIZED, "Unauthorized", "Invalid email or password.", request.getRequestURI());
     }
 
     @ExceptionHandler(AccessDeniedException.class)
-    public ResponseEntity<ErrorResponse> handleAccessDenied(AccessDeniedException ex) {
+    public ResponseEntity<ApiErrorResponse> handleAccessDenied(AccessDeniedException ex, HttpServletRequest request) {
         log.warn("Access denied: {}", ex.getMessage());
-        return buildErrorResponse(HttpStatus.FORBIDDEN, "Forbidden", "You do not have permission to access this resource.");
+        return buildErrorResponse(HttpStatus.FORBIDDEN, "Forbidden", "You do not have permission to access this resource.", request.getRequestURI());
     }
 
     @ExceptionHandler({
@@ -43,9 +45,9 @@ public class GlobalExceptionHandler {
             ClassroomNotFoundException.class,
             AssignmentNotFoundException.class
     })
-    public ResponseEntity<ErrorResponse> handleNotFoundExceptions(RuntimeException ex) {
+    public ResponseEntity<ApiErrorResponse> handleNotFoundExceptions(RuntimeException ex, HttpServletRequest request) {
         log.warn("Resource Not Found: {}", ex.getMessage());
-        return buildErrorResponse(HttpStatus.NOT_FOUND, "Not Found", ex.getMessage());
+        return buildErrorResponse(HttpStatus.NOT_FOUND, "Not Found", ex.getMessage(), request.getRequestURI());
     }
 
     @ExceptionHandler({
@@ -53,53 +55,55 @@ public class GlobalExceptionHandler {
             DuplicateStudentException.class,
             StudentAlreadyEnrolledException.class
     })
-    public ResponseEntity<ErrorResponse> handleConflicts(RuntimeException ex) {
+    public ResponseEntity<ApiErrorResponse> handleConflicts(RuntimeException ex, HttpServletRequest request) {
         log.warn("Conflict Error: {}", ex.getMessage());
-        return buildErrorResponse(HttpStatus.CONFLICT, "Conflict", ex.getMessage());
+        return buildErrorResponse(HttpStatus.CONFLICT, "Conflict", ex.getMessage(), request.getRequestURI());
     }
 
     @ExceptionHandler(ValidationFailedException.class)
-    public ResponseEntity<ErrorResponse> handleValidationFailed(ValidationFailedException ex) {
+    public ResponseEntity<ApiErrorResponse> handleValidationFailed(ValidationFailedException ex, HttpServletRequest request) {
         log.warn("Validation Failed: {}", ex.getMessage());
-        return buildErrorResponse(HttpStatus.BAD_REQUEST, "Bad Request", ex.getMessage());
+        return buildErrorResponse(HttpStatus.BAD_REQUEST, "Bad Request", ex.getMessage(), request.getRequestURI());
     }
 
     @ExceptionHandler(LeetCodeApiException.class)
-    public ResponseEntity<ErrorResponse> handleLeetCodeApiError(LeetCodeApiException ex) {
+    public ResponseEntity<ApiErrorResponse> handleLeetCodeApiError(LeetCodeApiException ex, HttpServletRequest request) {
         log.warn("External API Error: {}", ex.getMessage());
-        return buildErrorResponse(HttpStatus.BAD_GATEWAY, "Bad Gateway", ex.getMessage());
-    }
-
-    @ExceptionHandler(Exception.class)
-    public ResponseEntity<ErrorResponse> handleGenericException(Exception ex) {
-        log.error("An Unexpected error occurred: ", ex);
-        return buildErrorResponse(
-                HttpStatus.INTERNAL_SERVER_ERROR,
-                "INTERNAL_SERVER_ERROR",
-                "An Unexpected Error occurred. Please Contact Support."
-        );
+        return buildErrorResponse(HttpStatus.BAD_GATEWAY, "Bad Gateway", ex.getMessage(), request.getRequestURI());
     }
 
     @ExceptionHandler(TokenRefreshException.class)
-    public ResponseEntity<ErrorResponse> handleTokenRefreshException(TokenRefreshException ex){
+    public ResponseEntity<ApiErrorResponse> handleTokenRefreshException(TokenRefreshException ex, HttpServletRequest request){
         log.warn("Refresh Token Error: {}", ex.getMessage());
-        return buildErrorResponse(HttpStatus.FORBIDDEN, "Forbidden", ex.getMessage());
+        return buildErrorResponse(HttpStatus.FORBIDDEN, "Forbidden", ex.getMessage(), request.getRequestURI());
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
-    public ResponseEntity<ErrorResponse> handleIllegalArgumentException(IllegalArgumentException ex) {
+    public ResponseEntity<ApiErrorResponse> handleIllegalArgumentException(IllegalArgumentException ex, HttpServletRequest request) {
         log.warn("Illegal Argument provided: {}", ex.getMessage());
-        return buildErrorResponse(HttpStatus.BAD_REQUEST, "Bad Request", ex.getMessage());
+        return buildErrorResponse(HttpStatus.BAD_REQUEST, "Bad Request", ex.getMessage(), request.getRequestURI());
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<ErrorResponse> handleValidationExceptions(org.springframework.web.bind.MethodArgumentNotValidException ex) {
+    public ResponseEntity<ApiErrorResponse> handleValidationExceptions(MethodArgumentNotValidException ex, HttpServletRequest request) {
         StringBuilder errorMessage = new StringBuilder("Invalid input data: ");
         ex.getBindingResult().getFieldErrors().forEach(error ->
                 errorMessage.append(error.getField()).append(" ").append(error.getDefaultMessage()).append("; ")
         );
 
         log.warn("DTO Validation Failed: {}", errorMessage);
-        return buildErrorResponse(HttpStatus.BAD_REQUEST, "Bad Request", errorMessage.toString());
+        return buildErrorResponse(HttpStatus.BAD_REQUEST, "Bad Request", errorMessage.toString(), request.getRequestURI());
+    }
+
+    // Catch-All must be at the bottom
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<ApiErrorResponse> handleGenericException(Exception ex, HttpServletRequest request) {
+        log.error("An Unexpected error occurred: ", ex);
+        return buildErrorResponse(
+                HttpStatus.INTERNAL_SERVER_ERROR,
+                "INTERNAL_SERVER_ERROR",
+                "An Unexpected Error occurred. Please Contact Support.",
+                request.getRequestURI()
+        );
     }
 }
