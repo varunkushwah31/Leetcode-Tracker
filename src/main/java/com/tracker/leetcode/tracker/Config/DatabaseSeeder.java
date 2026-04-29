@@ -22,7 +22,7 @@ public class DatabaseSeeder implements CommandLineRunner {
     private final PasswordEncoder passwordEncoder;
 
     @Override
-    public void run(String @NonNull ... args) throws Exception {
+    public void run(String @NonNull ... args){
         // 1. Check if ANY Super Admin exists in the database
         boolean adminExists = mentorRepository.findAll().stream()
                 .anyMatch(mentor -> mentor.getRole() == Role.SUPER_ADMIN);

@@ -1,7 +1,6 @@
 package com.tracker.leetcode.tracker.Security;
 
 import com.tracker.leetcode.tracker.Exception.ApiErrorResponse;
-import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -26,7 +25,7 @@ public class CustomAuthenticationEntryPoint implements AuthenticationEntryPoint 
 
     @Override
     public void commence(@NonNull HttpServletRequest request, HttpServletResponse response, @NonNull AuthenticationException authException)
-            throws IOException, ServletException {
+            throws IOException {
 
         // Use our new ApiErrorResponse with the Builder pattern
         ApiErrorResponse errorResponse = ApiErrorResponse.builder()
