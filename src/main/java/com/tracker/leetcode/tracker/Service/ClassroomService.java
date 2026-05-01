@@ -102,27 +102,28 @@ public class ClassroomService {
         // 3. Apply Dynamic Sorting
         if (sortBy != null && !sortBy.isBlank()) {
             switch (sortBy.toLowerCase()) {
-                case "consistency":
-                    studentSummaries.sort((s1, s2) -> Integer.compare(s2.getConsistencyStreak(), s1.getConsistencyStreak()));
-                    break;
-                case "rating":
-                    studentSummaries.sort((s1, s2) -> Double.compare(s2.getCurrentContestRating(), s1.getCurrentContestRating()));
-                    break;
-                case "solved":
-                    studentSummaries.sort((s1, s2) -> Integer.compare(s2.getTotalSolved(), s1.getTotalSolved()));
-                    break;
-                case "pending": // Sort by students who are falling behind!
-                    studentSummaries.sort((s1, s2) -> Integer.compare(s2.getPendingAssignments(), s1.getPendingAssignments()));
-                    break;
-                case "completed": // Sort by students who finished the most assignments!
-                    studentSummaries.sort((s1, s2) -> Integer.compare(s2.getCompletedAssignments(), s1.getCompletedAssignments()));
-                    break;
-                case "name":
-                    studentSummaries.sort((s1, s2) -> s1.getName().compareToIgnoreCase(s2.getName()));
-                    break;
-                default:
-                    log.warn("Unknown sort parameter: {}. Defaulting to unsorted.", sortBy);
+                case "consistency" -> studentSummaries.sort((s1, s2) -> Integer.compare(s2.getConsistencyStreak(), s1.getConsistencyStreak()));
+                case "rating" -> studentSummaries.sort((s1, s2) -> Double.compare(s2.getCurrentContestRating(), s1.getCurrentContestRating()));
+                case "solved" -> studentSummaries.sort((s1, s2) -> Integer.compare(s2.getTotalSolved(), s1.getTotalSolved()));
+                case "pending" -> studentSummaries.sort((s1, s2) -> Integer.compare(s2.getPendingAssignments(), s1.getPendingAssignments()));
+                case "completed" -> studentSummaries.sort((s1, s2) -> Integer.compare(s2.getCompletedAssignments(), s1.getCompletedAssignments()));
+                case "name" -> studentSummaries.sort((s1, s2) -> s1.getName().compareToIgnoreCase(s2.getName()));
+                default -> log.warn("Unknown sort parameter: {}. Defaulting to unsorted.", sortBy);
             }
+        }
+
+        // --- NEW: Map the Assignments! ---
+        List<com.tracker.leetcode.tracker.DTO.AssignmentDTO> assignmentDTOs = new ArrayList<>();
+        if (classroom.getAssignments() != null) {
+            assignmentDTOs = classroom.getAssignments().stream()
+                    .map(a -> com.tracker.leetcode.tracker.DTO.AssignmentDTO.builder()
+                            .id(a.getId())
+                            .titleSlug(a.getTitleSlug())
+                            .questionLink(a.getQuestionLink())
+                            .startTimestamp(a.getStartTimestamp())
+                            .endTimestamp(a.getEndTimestamp())
+                            .build())
+                    .toList();
         }
 
         // 4. Return the fully built Dashboard
@@ -131,6 +132,7 @@ public class ClassroomService {
                 .className(classroom.getClassName())
                 .mentorName(mentor.getName())
                 .enrolledStudents(studentSummaries)
+                .assignments(assignmentDTOs) // <-- THIS IS THE MISSING LINK!
                 .build();
     }
 
@@ -441,5 +443,26 @@ public class ClassroomService {
         // 4. Delete the actual classroom document
         classroomRepository.delete(classroom);
         log.info("Successfully deleted classroom ID: {}", classroomId);
+    }
+
+    public void deleteAssignment(String classroomId, String assignmentId, String mentorId) {
+        // 1. Fetch the classroom
+        Classroom classroom = classroomRepository.findById(classroomId)
+                .orElseThrow(() -> new ClassroomNotFoundException("Classroom not found."));
+
+        // 2. Verify ownership
+        if (!classroom.getMentorId().equals(mentorId)) {
+            throw new AccessDeniedException("You do not have permission to modify this classroom.");
+        }
+
+        // 3. Remove the assignment (assuming assignment has a getId() method)
+        boolean removed = classroom.getAssignments().removeIf(a -> a.getId().equals(assignmentId));
+
+        if (!removed) {
+            throw new AssignmentNotFoundException("Assignment not found in this classroom.");
+        }
+
+        // 4. Save the updated classroom
+        classroomRepository.save(classroom);
     }
 }

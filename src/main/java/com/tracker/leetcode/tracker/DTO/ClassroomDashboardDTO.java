@@ -16,6 +16,9 @@ public class ClassroomDashboardDTO {
     private String className;
     private String mentorName;
 
-    // Notice we reuse our existing StudentSummaryDTO here!
+    // The list of students for the leaderboard
     private List<StudentSummaryDTO> enrolledStudents;
+
+    // NEW: The list of active assignments for the "Manage Assignments" tab
+    private List<AssignmentDTO> assignments;
 }

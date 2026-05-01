@@ -16,6 +16,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import java.util.List;
+import java.util.Map;
+
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 
@@ -146,5 +148,16 @@ public class ClassroomController {
 
         classroomService.deleteClassroom(classroomId, mentorId);
         return ResponseEntity.ok("Classroom deleted successfully.");
+    }
+
+    @DeleteMapping("/{classroomId}/assignments/{assignmentId}")
+    public ResponseEntity<Map<String, String>> deleteAssignment(
+            @PathVariable String classroomId,
+            @PathVariable String assignmentId,
+            @RequestParam String mentorId) {
+
+        classroomService.deleteAssignment(classroomId, assignmentId, mentorId);
+
+        return ResponseEntity.ok(Map.of("message", "Assignment deleted successfully."));
     }
 }
