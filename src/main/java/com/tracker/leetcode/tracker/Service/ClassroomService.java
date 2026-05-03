@@ -153,6 +153,7 @@ public class ClassroomService {
             assignment.setQuestionLink("https://leetcode.com/problems/" + assignment.getTitleSlug() + "/");
         }
 
+
         // Defensive programming: initialize assignments array if null
         initializeAssignmentsIfNull(classroom);
 
