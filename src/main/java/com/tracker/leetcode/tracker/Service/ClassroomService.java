@@ -154,6 +154,7 @@ public class ClassroomService {
         }
 
 
+
         // Defensive programming: initialize assignments array if null
         initializeAssignmentsIfNull(classroom);
 
