@@ -9,7 +9,7 @@ RUN mvn dependency:go-offline -B
 
 # Copy your actual source code and build it
 COPY src ./src
-RUN mvn clean package -DskipTests
+RUN mvn clean package -Dmaven.test.skip=true
 
 # STAGE 2: Run the application
 # Using the lightweight Java 25 JRE to run the compiled jar
