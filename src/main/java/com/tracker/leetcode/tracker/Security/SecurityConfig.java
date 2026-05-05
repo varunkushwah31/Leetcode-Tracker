@@ -27,7 +27,7 @@ public class SecurityConfig {
     private final CustomAuthenticationEntryPoint customAuthenticationEntryPoint;
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) {
         http
                 // 1. Tell Spring Security to use our Master CORS config
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
@@ -82,7 +82,7 @@ public class SecurityConfig {
                 "http://localhost:5174",
                 "http://localhost:8081",
                 "http://localhost:8080",
-                "https://leettracker-backend.onrender.com"
+                "https://mentorsync-theta.vercel.app"
         ));
 
         // Allow all standard HTTP methods, including OPTIONS
