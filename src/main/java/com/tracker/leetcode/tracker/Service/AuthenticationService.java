@@ -11,6 +11,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -33,13 +34,21 @@ public class AuthenticationService {
         return String.format("%06d", new java.util.Random().nextInt(999999));
     }
 
-    // 1. REGISTRATION LOGIC (Now returns a String message instead of tokens)
+    // 1. REGISTRATION LOGIC
 
     public String register(RegisterRequest request){
         log.info("Registering new Mentor with email: {}", request.email());
-        if (mentorRepository.findByEmail(request.email()).isPresent()){
-            throw new DuplicateMentorException("Email already in use.");
+
+        var existingMentor = mentorRepository.findByEmail(request.email());
+        if (existingMentor.isPresent()) {
+            if (existingMentor.get().isEmailVerified()) {
+                throw new DuplicateMentorException("Email already in use.");
+            } else {
+                log.info("Deleting abandoned, unverified Mentor account for: {}", request.email());
+                mentorRepository.delete(existingMentor.get());
+            }
         }
+
         Mentor mentor = new Mentor();
         mentor.setName(request.name());
         mentor.setEmail(request.email());
@@ -48,7 +57,6 @@ public class AuthenticationService {
         mentor.setProvider(AuthProvider.LOCAL);
         mentor.setEnabled(true);
 
-        // NEW: OTP Logic
         String otp = generateOtp();
         mentor.setOtp(otp);
         mentor.setOtpExpiryTime(System.currentTimeMillis() + (10 * 60 * 1000)); // 10 mins
@@ -62,9 +70,17 @@ public class AuthenticationService {
 
     public String registerStudent(StudentRegisterRequest request){
         log.info("Registering new student: {}", request.email());
-        if (studentRepository.findByEmail(request.email()).isPresent()){
-            throw new DuplicateMentorException("Student email already in use.");
+
+        var existingStudent = studentRepository.findByEmail(request.email());
+        if (existingStudent.isPresent()) {
+            if (existingStudent.get().isEmailVerified()) {
+                throw new DuplicateMentorException("Student email already in use.");
+            } else {
+                log.info("Deleting abandoned, unverified Student account for: {}", request.email());
+                studentRepository.delete(existingStudent.get());
+            }
         }
+
         Student student = new Student();
         student.setName(request.name());
         student.setEmail(request.email());
@@ -74,7 +90,6 @@ public class AuthenticationService {
         student.setAuthProvider(AuthProvider.LOCAL);
         student.setEnabled(true);
 
-        // NEW: OTP Logic
         String otp = generateOtp();
         student.setOtp(otp);
         student.setOtpExpiryTime(System.currentTimeMillis() + (10 * 60 * 1000)); // 10 mins
@@ -96,38 +111,36 @@ public class AuthenticationService {
 
     // NEW: VERIFY OTP LOGIC
     public AuthenticationResponse verifyEmail(VerifyOtpRequest request) {
-        // Check Students first
         var studentOpt = studentRepository.findByEmail(request.getEmail());
         if (studentOpt.isPresent()) {
             Student student = studentOpt.get();
-            if (student.getOtpExpiryTime() < System.currentTimeMillis()) throw new UserAuthenticationException("OTP has expired");
-            if (!student.getOtp().equals(request.getOtp())) throw new UserAuthenticationException("Invalid OTP");
+            validateOtp(student.getOtpExpiryTime(), student.getOtp(), request.getOtp());
 
             student.setEmailVerified(true);
             student.setOtp(null);
             student.setOtpExpiryTime(0);
             studentRepository.save(student);
-            return generateAuthResponseForStudent(student);
+
+            return buildAuthResponse(student.getId(), student.getName(), student.getRole(), student);
         }
 
-        // Check Mentors
         var mentorOpt = mentorRepository.findByEmail(request.getEmail());
         if (mentorOpt.isPresent()) {
             Mentor mentor = mentorOpt.get();
-            if (mentor.getOtpExpiryTime() < System.currentTimeMillis()) throw new UserAuthenticationException("OTP has expired");
-            if (!mentor.getOtp().equals(request.getOtp())) throw new UserAuthenticationException("Invalid OTP");
+            validateOtp(mentor.getOtpExpiryTime(), mentor.getOtp(), request.getOtp());
 
             mentor.setEmailVerified(true);
             mentor.setOtp(null);
             mentor.setOtpExpiryTime(0);
             mentorRepository.save(mentor);
-            return generateAuthResponseForMentor(mentor);
+
+            return buildAuthResponse(mentor.getId(), mentor.getName(), mentor.getRole(), mentor);
         }
 
         throw new UserAuthenticationException("User not found");
     }
 
-    // 2. LOGIN LOGIC (Now blocks unverified users)
+    // 2. LOGIN LOGIC
 
     public AuthenticationResponse authenticate(AuthenticationRequest request) {
         try {
@@ -140,13 +153,13 @@ public class AuthenticationService {
         var studentOpt = studentRepository.findByEmail(request.email());
         if (studentOpt.isPresent()) {
             if (!studentOpt.get().isEmailVerified()) throw new UserAuthenticationException("Please verify your email before logging in.");
-            return generateAuthResponseForStudent(studentOpt.get());
+            return buildAuthResponse(studentOpt.get().getId(), studentOpt.get().getName(), studentOpt.get().getRole(), studentOpt.get());
         }
 
         var mentorOpt = mentorRepository.findByEmail(request.email());
         if (mentorOpt.isPresent()) {
             if (!mentorOpt.get().isEmailVerified()) throw new UserAuthenticationException("Please verify your email before logging in.");
-            return generateAuthResponseForMentor(mentorOpt.get());
+            return buildAuthResponse(mentorOpt.get().getId(), mentorOpt.get().getName(), mentorOpt.get().getRole(), mentorOpt.get());
         }
 
         throw new UserAuthenticationException("User not found after successful authentication");
@@ -157,35 +170,18 @@ public class AuthenticationService {
     public AuthenticationResponse refreshToken(String requestRefreshToken){
         return refreshTokenService.findByToken(requestRefreshToken)
                 .map(refreshTokenService::verifyExpiration)
-                .map(RefreshToken::getMentorId) // Fetches the generic User ID attached to the token
+                .map(RefreshToken::getMentorId)
                 .map(userId -> {
-
-                    // Is this ID a Student?
                     var studentOpt = studentRepository.findById(userId);
                     if (studentOpt.isPresent()) {
-                        Student student = studentOpt.get();
-                        String jwtToken = jwtService.generateToken(student);
-                        return AuthenticationResponse.builder()
-                                .accessToken(jwtToken)
-                                .refreshToken(requestRefreshToken)
-                                .mentorId(student.getId())
-                                .name(student.getName())
-                                .role(student.getRole()) // <-- ADDED ROLE HERE
-                                .build();
+                        Student s = studentOpt.get();
+                        return buildAuthResponse(s.getId(), s.getName(), s.getRole(), s);
                     }
 
-                    // Is this ID a Mentor?
                     var mentorOpt = mentorRepository.findById(userId);
                     if (mentorOpt.isPresent()) {
-                        Mentor mentor = mentorOpt.get();
-                        String jwtToken = jwtService.generateToken(mentor);
-                        return AuthenticationResponse.builder()
-                                .accessToken(jwtToken)
-                                .refreshToken(requestRefreshToken)
-                                .mentorId(mentor.getId())
-                                .name(mentor.getName())
-                                .role(mentor.getRole()) // <-- ADDED ROLE HERE
-                                .build();
+                        Mentor m = mentorOpt.get();
+                        return buildAuthResponse(m.getId(), m.getName(), m.getRole(), m);
                     }
 
                     throw new UserAuthenticationException("User not found during refresh");
@@ -193,35 +189,31 @@ public class AuthenticationService {
                 .orElseThrow(() -> new UserAuthenticationException("Refresh token is not in database!"));
     }
 
-    // 4. DRY HELPER METHODS
+    // --------------------------------------------------------
+    // 4. SHARED DRY HELPER METHODS (Fixes the duplication warnings)
+    // --------------------------------------------------------
 
-    private AuthenticationResponse generateAuthResponseForStudent(Student student) {
-        String jwtToken = jwtService.generateToken(student);
-
-        refreshTokenService.deleteByMentorId(student.getId());
-        RefreshToken refreshToken = refreshTokenService.createRefreshToken(student.getId());
-
-        return AuthenticationResponse.builder()
-                .accessToken(jwtToken)
-                .refreshToken(refreshToken.getToken())
-                .mentorId(student.getId())
-                .name(student.getName())
-                .role(student.getRole()) // <-- ADDED ROLE HERE
-                .build();
+    private void validateOtp(long expiryTime, String storedOtp, String requestOtp) {
+        if (expiryTime < System.currentTimeMillis()) {
+            throw new UserAuthenticationException("OTP has expired");
+        }
+        if (storedOtp == null || !storedOtp.equals(requestOtp)) {
+            throw new UserAuthenticationException("Invalid OTP");
+        }
     }
 
-    private AuthenticationResponse generateAuthResponseForMentor(Mentor mentor) {
-        String jwtToken = jwtService.generateToken(mentor);
+    private AuthenticationResponse buildAuthResponse(String id, String name, Role role, UserDetails userDetails) {
+        String jwtToken = jwtService.generateToken(userDetails);
 
-        refreshTokenService.deleteByMentorId(mentor.getId());
-        RefreshToken refreshToken = refreshTokenService.createRefreshToken(mentor.getId());
+        refreshTokenService.deleteByMentorId(id);
+        RefreshToken refreshToken = refreshTokenService.createRefreshToken(id);
 
         return AuthenticationResponse.builder()
                 .accessToken(jwtToken)
                 .refreshToken(refreshToken.getToken())
-                .mentorId(mentor.getId())
-                .name(mentor.getName())
-                .role(mentor.getRole()) // <-- ADDED ROLE HERE
+                .mentorId(id)
+                .name(name)
+                .role(role)
                 .build();
     }
 }
