@@ -5,6 +5,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import org.jspecify.annotations.NonNull;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.security.core.GrantedAuthority;
@@ -33,6 +34,10 @@ public class Mentor implements UserDetails {
 
     private Role role;
 
+    private boolean isEmailVerified = false;
+    private String otp;
+    private long otpExpiryTime; // Store as epoch timestamp
+
     @Builder.Default
     private List<String> classroomIds = new ArrayList<>();
 
@@ -44,14 +49,14 @@ public class Mentor implements UserDetails {
 
     @Override
     @JsonIgnore
-    public Collection<? extends GrantedAuthority> getAuthorities() {
+    public @NonNull Collection<? extends GrantedAuthority> getAuthorities() {
         // This grants the user their role (e.g., "ROLE_MENTOR") so Spring can authorize routes
         return List.of(new SimpleGrantedAuthority("ROLE_" + role.name()));
     }
 
     @Override
     @JsonIgnore
-    public String getUsername() {
+    public @NonNull String getUsername() {
         // We use Email as the username for logging in
         return email;
     }

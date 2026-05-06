@@ -49,5 +49,23 @@ public class EmailService {
             log.error("Unexpected error while sending email to {}: {}", toEmail, e.getMessage());
         }
     }
+
+    @Async
+    public void sendVerificationOtp(String toEmail, String otp, String name) {
+        try {
+            SimpleMailMessage message = new SimpleMailMessage();
+            message.setTo(toEmail);
+            message.setSubject("MentorSync - Verify Your Email");
+            message.setText("Hi " + name + ",\n\n" +
+                    "Welcome to MentorSync! Your email verification code is: " + otp + "\n\n" +
+                    "This code will expire in 10 minutes.\n\n" +
+                    "If you didn't request this, please ignore this email.");
+
+            mailSender.send(message);
+            log.info("OTP email successfully sent to {}", toEmail);
+        } catch (Exception e) {
+            log.error("Failed to send OTP to {}: {}", toEmail, e.getMessage());
+        }
+    }
 }
 

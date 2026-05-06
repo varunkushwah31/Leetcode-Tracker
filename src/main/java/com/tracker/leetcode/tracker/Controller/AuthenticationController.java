@@ -31,19 +31,12 @@ public class AuthenticationController {
         response.addCookie(cookie);
     }
 
+    // 1. Updated Mentor Registration (Returns a message, NO cookie yet)
     @PostMapping("/register")
-    public ResponseEntity<AuthenticationResponse> register(@RequestBody RegisterRequest request,HttpServletResponse response){
-
-        AuthenticationResponse authResponse = authenticationService.register(request);
-        setRefreshTokenCookie(response, authResponse.refreshToken());
-
-        // Return everything EXCEPT the refresh token in the JSON body (it's in the cookie now!)
-        return ResponseEntity.ok(AuthenticationResponse.builder()
-                .accessToken(authResponse.accessToken())
-                .mentorId(authResponse.mentorId())
-                .name(authResponse.name())
-                .role(authResponse.role()) // <-- FIXED: Added Role
-                .build());
+    public ResponseEntity<?> register(@RequestBody RegisterRequest request) {
+        String message = authenticationService.register(request);
+        // Wrap the string in a JSON object so the frontend can read it easily
+        return ResponseEntity.ok(java.util.Map.of("message", message));
     }
 
     @PostMapping("/login")
@@ -101,18 +94,9 @@ public class AuthenticationController {
     }
 
     @PostMapping("/register/student")
-    public ResponseEntity<AuthenticationResponse> registerStudent(
-            @RequestBody StudentRegisterRequest request,
-            HttpServletResponse response){
-        AuthenticationResponse authResponse = authenticationService.registerStudent(request);
-        setRefreshTokenCookie(response, authResponse.refreshToken());
-
-        return ResponseEntity.ok(AuthenticationResponse.builder()
-                .accessToken(authResponse.accessToken())
-                .mentorId(authResponse.mentorId())
-                .name(authResponse.name())
-                .role(authResponse.role()) // <-- FIXED: Added Role
-                .build());
+    public ResponseEntity<?> registerStudent(@RequestBody StudentRegisterRequest request) {
+        String message = authenticationService.registerStudent(request);
+        return ResponseEntity.ok(java.util.Map.of("message", message));
     }
 
 
@@ -125,5 +109,26 @@ public class AuthenticationController {
         mentorRepository.save(mentor);
 
         return org.springframework.http.ResponseEntity.ok("Successfully promoted " + email + " to SUPER_ADMIN!");
+    }
+
+    // 3. NEW: The OTP Verification Endpoint (This sets the cookie and logs them in!)
+    @PostMapping("/verify-email")
+    public ResponseEntity<AuthenticationResponse> verifyEmail(
+            @RequestBody com.tracker.leetcode.tracker.DTO.VerifyOtpRequest request,
+            HttpServletResponse response) {
+
+        // 1. Verify the OTP
+        AuthenticationResponse authResponse = authenticationService.verifyEmail(request);
+
+        // 2. Set the Secure Refresh Cookie now that they are verified
+        setRefreshTokenCookie(response, authResponse.refreshToken());
+
+        // 3. Return the Access Token and user details
+        return ResponseEntity.ok(AuthenticationResponse.builder()
+                .accessToken(authResponse.accessToken())
+                .mentorId(authResponse.mentorId())
+                .name(authResponse.name())
+                .role(authResponse.role())
+                .build());
     }
 }

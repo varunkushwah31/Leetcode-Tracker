@@ -3,6 +3,7 @@ package com.tracker.leetcode.tracker.Models;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import org.jspecify.annotations.NonNull;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
@@ -45,6 +46,10 @@ public class Student implements UserDetails {
     private List<String > manuallyCompletedAssignments = new ArrayList<>();
     private List<SkillStat> skills = new ArrayList<>();
 
+    private boolean isEmailVerified = false;
+    private String otp;
+    private long otpExpiryTime; // Store as epoch timestamp
+
 
     public Student(String leetcodeUsername, String name) {
         this.leetcodeUsername = leetcodeUsername;
@@ -53,13 +58,13 @@ public class Student implements UserDetails {
 
     @Override
     @JsonIgnore
-    public Collection<? extends GrantedAuthority> getAuthorities() {
+    public @NonNull Collection<? extends GrantedAuthority> getAuthorities() {
         return List.of(new SimpleGrantedAuthority("ROLE_" + role.name()));
     }
 
     @Override
     @JsonIgnore
-    public String getUsername() {
+    public @NonNull String getUsername() {
         return email; // We use email to log in
     }
 
