@@ -38,6 +38,7 @@ public class SecurityConfig {
                         .authenticationEntryPoint(customAuthenticationEntryPoint)
                 )
 
+
                 .authorizeHttpRequests(auth -> auth
                         // 2. Explicitly allow all preflight OPTIONS requests without a token!
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
