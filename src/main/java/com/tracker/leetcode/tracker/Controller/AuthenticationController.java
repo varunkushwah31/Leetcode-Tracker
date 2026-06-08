@@ -24,19 +24,37 @@ public class AuthenticationController {
     // Helper to build the secure cookie
     private void setRefreshTokenCookie(HttpServletResponse response, String refreshToken) {
         Cookie cookie = new Cookie("refresh_token", refreshToken);
-        cookie.setHttpOnly(true); // Prevents JS access (XSS protection)
+        cookie.setHttpOnly(true);
         cookie.setSecure(false);  // Set to TRUE in production when using HTTPS!
-        cookie.setPath("/api/v1/auth/refresh"); // Cookie is ONLY sent to the refresh endpoint
-        cookie.setMaxAge(7 * 24 * 60 * 60); // 7 days in seconds
+        cookie.setPath("/api/v1/auth/refresh");
+        cookie.setMaxAge(7 * 24 * 60 * 60);
         response.addCookie(cookie);
     }
 
-    // 1. Updated Mentor Registration (Returns a message, NO cookie yet)
     @PostMapping("/register")
-    public ResponseEntity<?> register(@RequestBody RegisterRequest request) {
-        String message = authenticationService.register(request);
-        // Wrap the string in a JSON object so the frontend can read it easily
-        return ResponseEntity.ok(java.util.Map.of("message", message));
+    public ResponseEntity<AuthenticationResponse> register(@RequestBody RegisterRequest request, HttpServletResponse response) {
+        AuthenticationResponse authResponse = authenticationService.register(request);
+        setRefreshTokenCookie(response, authResponse.refreshToken());
+
+        return ResponseEntity.ok(AuthenticationResponse.builder()
+                .accessToken(authResponse.accessToken())
+                .mentorId(authResponse.mentorId())
+                .name(authResponse.name())
+                .role(authResponse.role())
+                .build());
+    }
+
+    @PostMapping("/register/student")
+    public ResponseEntity<AuthenticationResponse> registerStudent(@RequestBody StudentRegisterRequest request, HttpServletResponse response) {
+        AuthenticationResponse authResponse = authenticationService.registerStudent(request);
+        setRefreshTokenCookie(response, authResponse.refreshToken());
+
+        return ResponseEntity.ok(AuthenticationResponse.builder()
+                .accessToken(authResponse.accessToken())
+                .mentorId(authResponse.mentorId())
+                .name(authResponse.name())
+                .role(authResponse.role())
+                .build());
     }
 
     @PostMapping("/login")
@@ -50,27 +68,22 @@ public class AuthenticationController {
                 .accessToken(authResponse.accessToken())
                 .mentorId(authResponse.mentorId())
                 .name(authResponse.name())
-                .role(authResponse.role()) // <-- FIXED: Added Role
+                .role(authResponse.role())
                 .build());
     }
 
-    // NEW: The Refresh Endpoint
     @PostMapping("/refresh")
     public ResponseEntity<AuthenticationResponse> refresh(
             @CookieValue(name = "refresh_token", required = false) String refreshToken,
             HttpServletResponse response) {
 
         if (refreshToken == null) {
-            return ResponseEntity.status(401).build(); // No cookie, no refresh!
+            return ResponseEntity.status(401).build();
         }
 
-        // Rotate the tokens
         AuthenticationResponse authResponse = authenticationService.refreshToken(refreshToken);
-
-        // Set the NEW rotated refresh token in the cookie
         setRefreshTokenCookie(response, authResponse.refreshToken());
 
-        // Return the NEW access token
         return ResponseEntity.ok(AuthenticationResponse.builder()
                 .accessToken(authResponse.accessToken())
                 .mentorId(authResponse.mentorId())
@@ -79,26 +92,17 @@ public class AuthenticationController {
                 .build());
     }
 
-    // NEW: Logout Endpoint
     @PostMapping("/logout")
     public ResponseEntity<?> logout(HttpServletResponse response) {
-        // To log out, we simply overwrite the cookie with an immediate expiration date
         Cookie cookie = new Cookie("refresh_token", null);
         cookie.setHttpOnly(true);
-        cookie.setSecure(false); // Set to true for HTTPS
+        cookie.setSecure(false);
         cookie.setPath("/api/v1/auth/refresh");
-        cookie.setMaxAge(0); // Deletes the cookie
+        cookie.setMaxAge(0);
         response.addCookie(cookie);
 
         return ResponseEntity.noContent().build();
     }
-
-    @PostMapping("/register/student")
-    public ResponseEntity<?> registerStudent(@RequestBody StudentRegisterRequest request) {
-        String message = authenticationService.registerStudent(request);
-        return ResponseEntity.ok(java.util.Map.of("message", message));
-    }
-
 
     @GetMapping("/make-admin")
     public org.springframework.http.ResponseEntity<?> makeAdmin(@RequestParam String email) {
@@ -109,26 +113,5 @@ public class AuthenticationController {
         mentorRepository.save(mentor);
 
         return org.springframework.http.ResponseEntity.ok("Successfully promoted " + email + " to SUPER_ADMIN!");
-    }
-
-    // 3. NEW: The OTP Verification Endpoint (This sets the cookie and logs them in!)
-    @PostMapping("/verify-email")
-    public ResponseEntity<AuthenticationResponse> verifyEmail(
-            @RequestBody com.tracker.leetcode.tracker.DTO.VerifyOtpRequest request,
-            HttpServletResponse response) {
-
-        // 1. Verify the OTP
-        AuthenticationResponse authResponse = authenticationService.verifyEmail(request);
-
-        // 2. Set the Secure Refresh Cookie now that they are verified
-        setRefreshTokenCookie(response, authResponse.refreshToken());
-
-        // 3. Return the Access Token and user details
-        return ResponseEntity.ok(AuthenticationResponse.builder()
-                .accessToken(authResponse.accessToken())
-                .mentorId(authResponse.mentorId())
-                .name(authResponse.name())
-                .role(authResponse.role())
-                .build());
     }
 }
